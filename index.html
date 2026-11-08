@@ -1,0 +1,1773 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>つくろう！どうぶつもりの キラキラパフェやさん</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-pink: #ffe6f0;
+      --main-pink: #ff5287;
+      --dark-pink: #c7255d;
+      --gold: #ffb800;
+      --mint: #3ed1a7;
+      --font-family: 'M PLUS Rounded 1c', 'Hiragino Maru Gothic Pro', 'Meiryo', sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: var(--font-family);
+      background: linear-gradient(135deg, #ffd3e2 0%, #ffe9c7 50%, #d8f5ec 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: #55433c;
+      overflow-x: hidden;
+      padding: 6px;
+    }
+
+    #game-container {
+      width: 100%;
+      max-width: 480px;
+      height: 96vh;
+      max-height: 880px;
+      background: rgba(255, 255, 255, 0.94);
+      border-radius: 28px;
+      box-shadow: 0 12px 36px rgba(199, 37, 93, 0.2), 0 0 0 6px #fff;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* 上部バー */
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 14px;
+      background: #fff5f8;
+      border-bottom: 2px dashed #ffc6d9;
+      flex-shrink: 0;
+    }
+
+    .badge-info {
+      background: #fff;
+      border: 2px solid var(--main-pink);
+      color: var(--dark-pink);
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .top-btns {
+      display: flex;
+      gap: 6px;
+    }
+
+    .icon-btn {
+      background: #fff;
+      border: 2px solid #ffb3c9;
+      border-radius: 50%;
+      width: 38px;
+      height: 38px;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 3px 0 #ffa0ba;
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    .icon-btn:active {
+      transform: translateY(3px);
+      box-shadow: none;
+    }
+
+    /* 画面共通 */
+    .screen {
+      display: none;
+      flex-direction: column;
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+    .screen.active {
+      display: flex;
+    }
+
+    /* ===== タイトル画面 ===== */
+    #screen-title {
+      align-items: center;
+      justify-content: space-between;
+      text-align: center;
+      padding: 20px 16px;
+    }
+
+    .title-badge {
+      background: #ff5287;
+      color: #fff;
+      font-size: 13px;
+      padding: 4px 14px;
+      border-radius: 30px;
+      font-weight: 900;
+      animation: bounce 1.8s infinite;
+      box-shadow: 0 4px 10px rgba(255, 82, 135, 0.4);
+    }
+
+    .title-logo {
+      font-size: 30px;
+      line-height: 1.25;
+      color: #ff2d74;
+      text-shadow: 3px 3px 0 #fff, 5px 5px 0 #ffd1df;
+      font-weight: 900;
+      margin: 6px 0;
+    }
+
+    .title-cup-preview {
+      position: relative;
+      width: 170px;
+      height: 140px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .title-cup-img {
+      font-size: 68px;
+      animation: float 2.4s ease-in-out infinite alternate;
+      filter: drop-shadow(0 8px 12px rgba(0,0,0,0.15));
+    }
+    .title-floating-animals {
+      font-size: 30px;
+      display: flex;
+      gap: 14px;
+      margin-top: 2px;
+    }
+
+    /* ベスト記録バッジ（タイトル用） */
+    .title-best-record {
+      background: linear-gradient(135deg, #fff7d6, #ffe699);
+      border: 2px solid #ffc107;
+      border-radius: 16px;
+      padding: 6px 16px;
+      font-size: 14px;
+      font-weight: 900;
+      color: #b26a00;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 3px 0 #e0a800;
+    }
+
+    .cup-selector-banner {
+      background: #fff9e6;
+      border: 2px solid #ffd666;
+      border-radius: 16px;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 800;
+      color: #946200;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      box-shadow: 0 3px 0 #f0c040;
+    }
+
+    .btn-group-title {
+      width: 100%;
+      max-width: 320px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .big-btn {
+      width: 100%;
+      padding: 12px 18px;
+      font-size: 18px;
+      font-weight: 900;
+      font-family: inherit;
+      color: #fff;
+      border: none;
+      border-radius: 36px;
+      cursor: pointer;
+      box-shadow: 0 5px 0 rgba(0,0,0,0.15);
+      transition: all 0.1s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .big-btn:active {
+      transform: translateY(4px);
+      box-shadow: 0 1px 0 rgba(0,0,0,0.15);
+    }
+    .btn-shop {
+      background: linear-gradient(180deg, #ff6fa0 0%, #ff3074 100%);
+      box-shadow: 0 5px 0 #ba154e;
+    }
+    .btn-height {
+      background: linear-gradient(180deg, #ffbb33 0%, #ff8800 100%);
+      box-shadow: 0 5px 0 #b35900;
+    }
+    .btn-free {
+      background: linear-gradient(180deg, #3cd7ae 0%, #17b38d 100%);
+      box-shadow: 0 5px 0 #0f7a60;
+    }
+
+    /* ===== ゲーム画面 ===== */
+    #screen-game {
+      padding: 8px 10px 10px;
+      gap: 6px;
+    }
+
+    /* お客さん＆ちゅうもん */
+    .customer-panel {
+      background: #fff7fa;
+      border: 2px solid #ffd1e1;
+      border-radius: 18px;
+      padding: 6px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+      min-height: 68px;
+    }
+
+    .customer-avatar {
+      font-size: 40px;
+      background: #fff;
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.08);
+      flex-shrink: 0;
+    }
+    .customer-avatar.bounce {
+      animation: customerBounce 0.6s ease;
+    }
+    .customer-avatar.dizzy {
+      animation: customerDizzy 0.8s ease;
+    }
+
+    .customer-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .customer-speech-bubble {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+    }
+
+    .order-label {
+      font-size: 11px;
+      font-weight: 900;
+      color: #fff;
+      background: #ff4781;
+      padding: 2px 6px;
+      border-radius: 6px;
+      white-space: nowrap;
+    }
+
+    .order-list {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .order-item-chip {
+      font-size: 24px;
+      background: #fff;
+      border: 1px solid #ffccd9;
+      border-radius: 8px;
+      padding: 0 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .order-arrow {
+      font-size: 11px;
+      color: #ff6699;
+    }
+
+    /* 高さチャレンジ用ステータスパネル */
+    .height-challenge-panel {
+      background: #fffbe6;
+      border: 2px solid #ffd666;
+      border-radius: 18px;
+      padding: 6px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .height-meter-big {
+      font-size: 20px;
+      font-weight: 900;
+      color: #d46b08;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .height-best-badge {
+      font-size: 13px;
+      font-weight: 800;
+      color: #874d00;
+      background: #fff;
+      padding: 2px 10px;
+      border-radius: 12px;
+      border: 1px solid #ffd591;
+    }
+
+    /* 物理パフェステージ（Canvas） */
+    .physics-stage-wrap {
+      flex: 1;
+      position: relative;
+      width: 100%;
+      border-radius: 20px;
+      background: radial-gradient(circle at 50% 60%, #ffffff 0%, #fff0f6 100%);
+      border: 2px solid #ffe3ed;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #stage-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* カップ情報バッジ（ステージ内左上） */
+    .cup-level-indicator {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      background: rgba(255, 255, 255, 0.9);
+      border: 2px solid #ffd466;
+      border-radius: 12px;
+      padding: 3px 8px;
+      font-size: 12px;
+      font-weight: 800;
+      color: #946200;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      pointer-events: none;
+    }
+
+    /* トースト通知 */
+    .stage-toast {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%) scale(0.8);
+      background: #fff;
+      border: 3px solid #ff3377;
+      color: #ff2266;
+      font-size: 16px;
+      font-weight: 900;
+      padding: 6px 16px;
+      border-radius: 20px;
+      box-shadow: 0 6px 16px rgba(255, 51, 119, 0.3);
+      pointer-events: none;
+      opacity: 0;
+      transition: all 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+      z-index: 50;
+      white-space: nowrap;
+    }
+    .stage-toast.show {
+      transform: translateX(-50%) scale(1);
+      opacity: 1;
+    }
+    .stage-toast.record {
+      border-color: #ffaa00;
+      color: #d46b08;
+      box-shadow: 0 6px 16px rgba(255, 170, 0, 0.4);
+    }
+
+    /* 材料ボタンパレット */
+    .palette-grid {
+      background: #fff;
+      border: 2px solid #ffd5e4;
+      border-radius: 18px;
+      padding: 6px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 5px;
+      flex-shrink: 0;
+    }
+
+    .ing-btn {
+      background: #fff9fb;
+      border: 2px solid #ffd8e6;
+      border-radius: 12px;
+      padding: 4px 2px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1px;
+      cursor: pointer;
+      box-shadow: 0 3px 0 #ffc4d8;
+      transition: transform 0.08s, box-shadow 0.08s;
+    }
+    .ing-btn:active {
+      transform: translateY(3px);
+      box-shadow: none;
+      background: #ffeaf2;
+    }
+    .ing-btn .icon {
+      font-size: 28px;
+      line-height: 1;
+    }
+    .ing-btn .name {
+      font-size: 11px;
+      font-weight: 800;
+      color: #614d46;
+      white-space: nowrap;
+    }
+    .ing-btn.neta {
+      background: #fffde8;
+      border-color: #ffe97a;
+      box-shadow: 0 3px 0 #fada46;
+    }
+
+    /* アクションバー */
+    .action-row {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .btn-act {
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: none;
+      font-family: inherit;
+      font-weight: 900;
+      font-size: 15px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      box-shadow: 0 4px 0 rgba(0,0,0,0.12);
+      transition: transform 0.08s, box-shadow 0.08s;
+    }
+    .btn-act:active {
+      transform: translateY(4px);
+      box-shadow: none;
+    }
+    .btn-act-undo {
+      background: #f0f0f4;
+      color: #555;
+      box-shadow: 0 4px 0 #cfd0d8;
+      flex: 1;
+    }
+    .btn-act-clear {
+      background: #ffe3e3;
+      color: #cc3333;
+      box-shadow: 0 4px 0 #ffa8a8;
+      width: 44px;
+    }
+    .btn-act-serve {
+      background: linear-gradient(180deg, #ff578f 0%, #ff2d74 100%);
+      color: #fff;
+      box-shadow: 0 4px 0 #b3164a;
+      flex: 1.8;
+      font-size: 17px;
+    }
+
+    /* ===== リザルト画面 ===== */
+    #screen-result {
+      align-items: center;
+      justify-content: space-between;
+      text-align: center;
+      padding: 24px 16px;
+    }
+
+    .result-badge {
+      font-size: 14px;
+      background: #ff5287;
+      color: #fff;
+      padding: 4px 16px;
+      border-radius: 20px;
+      font-weight: 900;
+    }
+
+    .result-title {
+      font-size: 26px;
+      color: #ff2d74;
+      font-weight: 900;
+      margin: 4px 0;
+    }
+
+    .result-card {
+      background: #fff;
+      border: 3px solid #ffd4e4;
+      border-radius: 20px;
+      padding: 16px 20px;
+      width: 100%;
+      max-width: 360px;
+      box-shadow: 0 8px 24px rgba(255, 90, 140, 0.16);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .result-stars {
+      font-size: 34px;
+      letter-spacing: 4px;
+      color: #ffbb00;
+    }
+
+    .result-score {
+      font-size: 34px;
+      font-weight: 900;
+      color: #ff2a73;
+    }
+
+    .result-rank-text {
+      font-size: 15px;
+      background: #fff0f5;
+      border: 2px dashed #ff699f;
+      color: #c7255d;
+      padding: 6px 14px;
+      border-radius: 16px;
+      font-weight: 800;
+    }
+
+    /* 新記録お祝いバッジ */
+    .new-record-card-banner {
+      background: linear-gradient(135deg, #fff3c4, #ffd54f);
+      border: 2px solid #ffb300;
+      color: #b26a00;
+      font-size: 15px;
+      font-weight: 900;
+      padding: 6px 16px;
+      border-radius: 16px;
+      box-shadow: 0 4px 10px rgba(255, 179, 0, 0.3);
+      animation: bounce 1.5s infinite;
+    }
+
+    /* カップアンロック通知カード */
+    .cup-unlock-banner {
+      background: linear-gradient(135deg, #fff9d6, #ffe082);
+      border: 3px solid #ffca28;
+      border-radius: 18px;
+      padding: 10px 16px;
+      width: 100%;
+      max-width: 360px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 6px 16px rgba(255, 184, 0, 0.25);
+      animation: bounce 2s infinite;
+    }
+    .cup-unlock-icon {
+      font-size: 42px;
+    }
+    .cup-unlock-info {
+      text-align: left;
+    }
+    .cup-unlock-title {
+      font-size: 12px;
+      font-weight: 900;
+      color: #e65100;
+    }
+    .cup-unlock-name {
+      font-size: 16px;
+      font-weight: 900;
+      color: #bf360c;
+    }
+
+    /* カップ選択モーダル */
+    .modal-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.55);
+      backdrop-filter: blur(3px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      padding: 16px;
+    }
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal-box {
+      background: #fff;
+      border: 4px solid #ff70a0;
+      border-radius: 24px;
+      padding: 18px 16px;
+      width: 100%;
+      max-width: 380px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.25);
+    }
+
+    .modal-header {
+      font-size: 18px;
+      font-weight: 900;
+      color: #ff2d74;
+      text-align: center;
+    }
+
+    .cup-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+
+    .cup-card {
+      background: #fff7fa;
+      border: 2px solid #ffd4e4;
+      border-radius: 14px;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      transition: all 0.1s;
+    }
+    .cup-card.selected {
+      border-color: #ff2d74;
+      background: #ffe3ee;
+      box-shadow: 0 0 0 2px #ff2d74;
+    }
+    .cup-card.locked {
+      opacity: 0.5;
+      background: #f0f0f0;
+      border-color: #ddd;
+      cursor: not-allowed;
+    }
+    .cup-card-icon {
+      font-size: 32px;
+    }
+    .cup-card-details {
+      flex: 1;
+      text-align: left;
+    }
+    .cup-card-name {
+      font-size: 14px;
+      font-weight: 900;
+      color: #443;
+    }
+    .cup-card-desc {
+      font-size: 11px;
+      color: #776;
+    }
+
+    /* 紙吹雪Canvas */
+    #confetti-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-5px); }
+    }
+    @keyframes float {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(-8px); }
+    }
+    @keyframes customerBounce {
+      0%, 100% { transform: translateY(0) rotate(0); }
+      25% { transform: translateY(-12px) rotate(-8deg); }
+      75% { transform: translateY(-12px) rotate(8deg); }
+    }
+    @keyframes customerDizzy {
+      0%, 100% { transform: rotate(0); }
+      20% { transform: rotate(-15deg); }
+      40% { transform: rotate(15deg); }
+      60% { transform: rotate(-15deg); }
+      80% { transform: rotate(15deg); }
+    }
+  </style>
+  <script src="src/physics.js"></script>
+  <script src="src/game-logic.js"></script>
+</head>
+<body>
+
+  <div id="game-container">
+    <canvas id="confetti-canvas"></canvas>
+
+    <!-- ステータスバー -->
+    <div class="top-bar">
+      <div class="badge-info" id="status-badge">
+        <span>🍦</span><span id="badge-text">パフェやさん</span>
+      </div>
+      <div class="top-btns">
+        <button class="icon-btn" id="btn-cup-modal" title="カップをえらぶ">🏆</button>
+        <button class="icon-btn" id="btn-sound-toggle" title="おとのきりかえ">🔔</button>
+        <button class="icon-btn" id="btn-home" style="display:none;" title="タイトルへ">🏠</button>
+      </div>
+    </div>
+
+    <!-- トースト通知 -->
+    <div id="stage-toast" class="stage-toast">おっとっと！</div>
+
+    <!-- ① タイトル画面 -->
+    <div class="screen active" id="screen-title">
+      <div class="title-badge">めざせ！てんまでとどくパフェタワー！</div>
+      <h1 class="title-logo">つくろう！<br>どうぶつもりの<br>キラキラパフェやさん</h1>
+
+      <div class="title-cup-preview">
+        <div class="title-cup-img" id="title-cup-display">🍨</div>
+        <div class="title-floating-animals">
+          <span>🐰</span><span>🐻</span><span>🐱</span><span>🐼</span>
+        </div>
+      </div>
+
+      <div class="title-best-record" id="title-best-record">
+        <span>👑</span><span id="title-best-record-text">さいこうきろく：0cm</span>
+        <button id="btn-reset-record" style="background:#fff; border:1px solid #ffaa00; border-radius:10px; padding:2px 8px; font-size:11px; font-weight:800; cursor:pointer; color:#b26a00; margin-left:6px;" title="きろくをリセット">リセット</button>
+      </div>
+
+      <div class="cup-selector-banner" id="btn-open-cups">
+        <span>🏆</span><span id="current-cup-name-label">いまのカップ：ちいさなプチカップ</span><span>➔</span>
+      </div>
+
+      <div class="btn-group-title">
+        <button class="big-btn btn-shop" id="btn-start-shop">
+          <span>🏬</span> おみせやさん で あそぶ
+        </button>
+        <button class="big-btn btn-height" id="btn-start-height">
+          <span>📏</span> たかさチャレンジ！
+        </button>
+        <button class="big-btn btn-free" id="btn-start-free">
+          <span>🎨</span> じゆうに つくる
+        </button>
+      </div>
+    </div>
+
+    <!-- ② メインゲーム画面 -->
+    <div class="screen" id="screen-game">
+      <!-- お客さん＆ちゅうもんパネル（おみせやさんモード用） -->
+      <div class="customer-panel" id="customer-panel">
+        <div class="customer-avatar" id="customer-avatar">🐰</div>
+        <div class="customer-info">
+          <div style="font-size:12px; font-weight:900; color:#c7255d;" id="customer-name">うさぎさん の ちゅうもん</div>
+          <div class="customer-speech-bubble">
+            <span class="order-label">したから</span>
+            <div class="order-list" id="order-items"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 高さチャレンジ用ステータスパネル -->
+      <div class="height-challenge-panel" id="height-challenge-panel" style="display:none;">
+        <div class="height-meter-big">
+          <span>📏</span><span id="live-height-text">0cm</span>
+        </div>
+        <div class="height-best-badge" id="live-best-badge">
+          👑 ベスト：0cm
+        </div>
+      </div>
+
+      <!-- 物理パフェステージ -->
+      <div class="physics-stage-wrap" id="physics-stage-wrap">
+        <canvas id="stage-canvas"></canvas>
+        <div class="cup-level-indicator" id="stage-cup-indicator">
+          <span>🏆</span><span id="stage-cup-name">プチカップ</span>
+        </div>
+      </div>
+
+      <!-- 材料パレット -->
+      <div class="palette-grid" id="palette"></div>
+
+      <!-- アクションバー -->
+      <div class="action-row">
+        <button class="btn-act btn-act-undo" id="btn-undo">
+          <span>↩️</span> 1つもどす
+        </button>
+        <button class="btn-act btn-act-clear" id="btn-clear" title="ぜんぶやりなおし">
+          <span>🗑️</span>
+        </button>
+        <button class="btn-act btn-act-serve" id="btn-serve">
+          <span>✨</span> はい、どうぞ！
+        </button>
+      </div>
+    </div>
+
+    <!-- ③ リザルト画面 -->
+    <div class="screen" id="screen-result">
+      <div class="result-badge" id="result-badge-text">けっかはっぴょう！</div>
+      <h2 class="result-title" id="result-title-text">ごちそうさまでした！</h2>
+
+      <div class="result-card">
+        <div class="new-record-card-banner" id="new-record-card-banner" style="display:none;">
+          🌟 しんきろく たっせい！ 🌟
+        </div>
+        <div class="result-stars" id="result-stars">⭐⭐⭐</div>
+        <div class="result-score" id="result-score">300 てん</div>
+        <div class="result-rank-text" id="result-rank">でんせつの パフェマスター！✨</div>
+      </div>
+
+      <!-- 新カップ解放通知 -->
+      <div class="cup-unlock-banner" id="cup-unlock-banner" style="display:none;">
+        <div class="cup-unlock-icon" id="unlock-cup-icon">👑</div>
+        <div class="cup-unlock-info">
+          <div class="cup-unlock-title">あたらしい カップを ゲット！🎉</div>
+          <div class="cup-unlock-name" id="unlock-cup-name">おうごんの王冠カップ</div>
+        </div>
+      </div>
+
+      <div class="btn-group-title">
+        <button class="big-btn btn-shop" id="btn-retry">
+          <span>🔄</span> もういっかい あそぶ
+        </button>
+        <button class="big-btn btn-free" id="btn-result-home">
+          <span>🏠</span> タイトルにもどる
+        </button>
+      </div>
+    </div>
+
+    <!-- カップ選択モーダル -->
+    <div class="modal-overlay" id="modal-cups">
+      <div class="modal-box">
+        <div class="modal-header">🏆 つかうカップを えらんでね！</div>
+        <div class="cup-list" id="modal-cup-list"></div>
+        <button class="big-btn btn-shop" id="btn-close-modal" style="padding:10px; font-size:16px;">
+          とじる
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    /* ==========================================================
+       1. サウンドエンジン（Web Audio API）
+       ========================================================== */
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+        this.bgmTimer = null;
+        this.bgmStep = 0;
+      }
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioContext();
+        }
+        if (this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+      toggle() {
+        this.enabled = !this.enabled;
+        if (!this.enabled && this.bgmTimer) {
+          clearInterval(this.bgmTimer);
+          this.bgmTimer = null;
+        } else if (this.enabled) {
+          this.startBgm();
+        }
+        return this.enabled;
+      }
+      playPop(pitchMod = 1) {
+        if (!this.enabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const freq = 420 * pitchMod;
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now);
+        osc.frequency.exponentialRampToValueAtTime(freq * 1.6, now + 0.09);
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.16);
+      }
+      playFall() {
+        if (!this.enabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(450, now);
+        osc.frequency.exponentialRampToValueAtTime(150, now + 0.22);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.22);
+      }
+      playUndo() {
+        if (!this.enabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(600, now);
+        osc.frequency.exponentialRampToValueAtTime(280, now + 0.1);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.1);
+      }
+      playSuccess() {
+        if (!this.enabled) return;
+        this.init();
+        [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => {
+          setTimeout(() => {
+            if (!this.enabled) return;
+            const now = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now);
+            gain.gain.setValueAtTime(0.28, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.32);
+          }, i * 90);
+        });
+      }
+      playRecord() {
+        if (!this.enabled) return;
+        this.init();
+        [659.25, 783.99, 987.77, 1318.51].forEach((freq, i) => {
+          setTimeout(() => {
+            if (!this.enabled) return;
+            const now = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now);
+            gain.gain.setValueAtTime(0.3, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.3);
+          }, i * 80);
+        });
+      }
+      playGood() {
+        if (!this.enabled) return;
+        this.init();
+        [659.25, 783.99].forEach((freq, i) => {
+          setTimeout(() => {
+            if (!this.enabled) return;
+            const now = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now);
+            gain.gain.setValueAtTime(0.25, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.22);
+          }, i * 110);
+        });
+      }
+      playFunny() {
+        if (!this.enabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(260, now);
+        osc.frequency.exponentialRampToValueAtTime(90, now + 0.35);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.35);
+      }
+      playClick() {
+        if (!this.enabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(750, now);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.04);
+      }
+      startBgm() {
+        if (!this.enabled || this.bgmTimer) return;
+        const notes = [523, 659, 784, 880, 784, 659, 587, 523];
+        this.bgmTimer = setInterval(() => {
+          if (!this.enabled) return;
+          this.init();
+          const freq = notes[this.bgmStep % notes.length];
+          this.bgmStep++;
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now);
+          gain.gain.setValueAtTime(0.02, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.3);
+        }, 520);
+      }
+    }
+    const sound = new SoundEngine();
+
+    /* ==========================================================
+       2. 紙吹雪演出
+       ========================================================== */
+    const confCanvas = document.getElementById('confetti-canvas');
+    const confCtx = confCanvas.getContext('2d');
+    let confParticles = [];
+    let confLoop = null;
+
+    function resizeConfetti() {
+      confCanvas.width = confCanvas.parentElement.clientWidth;
+      confCanvas.height = confCanvas.parentElement.clientHeight;
+    }
+    window.addEventListener('resize', resizeConfetti);
+    resizeConfetti();
+
+    function fireConfetti() {
+      resizeConfetti();
+      confParticles = [];
+      const cols = ['#ff4081', '#ffc107', '#00e676', '#00b0ff', '#e040fb'];
+      for (let i = 0; i < 70; i++) {
+        confParticles.push({
+          x: confCanvas.width / 2,
+          y: confCanvas.height * 0.4,
+          vx: (Math.random() - 0.5) * 16,
+          vy: (Math.random() - 0.8) * 18,
+          sz: Math.random() * 8 + 6,
+          col: cols[Math.floor(Math.random() * cols.length)],
+          rot: Math.random() * 360,
+          vRot: (Math.random() - 0.5) * 12,
+          alpha: 1
+        });
+      }
+      if (!confLoop) animConfetti();
+    }
+
+    function animConfetti() {
+      confCtx.clearRect(0, 0, confCanvas.width, confCanvas.height);
+      for (let p of confParticles) {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.42;
+        p.rot += p.vRot;
+        p.alpha -= 0.009;
+        if (p.alpha > 0) {
+          confCtx.save();
+          confCtx.translate(p.x, p.y);
+          confCtx.rotate((p.rot * Math.PI) / 180);
+          confCtx.fillStyle = p.col;
+          confCtx.globalAlpha = p.alpha;
+          confCtx.fillRect(-p.sz / 2, -p.sz / 2, p.sz, p.sz);
+          confCtx.restore();
+        }
+      }
+      confParticles = confParticles.filter(p => p.alpha > 0);
+      if (confParticles.length > 0) {
+        confLoop = requestAnimationFrame(animConfetti);
+      } else {
+        confLoop = null;
+        confCtx.clearRect(0, 0, confCanvas.width, confCanvas.height);
+      }
+    }
+
+    /* ==========================================================
+       3. 物理シミュレーション＆Canvas描画（目盛り線・記録ライン）
+       ========================================================== */
+    const stageCanvas = document.getElementById('stage-canvas');
+    const stageCtx = stageCanvas.getContext('2d');
+    const stageWrap = document.getElementById('physics-stage-wrap');
+
+    let bodies = [];
+    let selectedCup = ParfaitGameLogic.CUPS[0];
+    let totalClears = 0;
+    let cupGeom = null;
+
+    // 高さ・ベスト記録管理
+    const PX_PER_CM = 6;
+    let currentHeightCm = 0;
+    let bestHeightRecord = parseInt(localStorage.getItem('parfait_best_height') || '0', 10);
+    // 前回のバグによる不正な巨大値（70cm以上）が残っている場合は自動クリーンアップ
+    if (bestHeightRecord > 65) {
+      bestHeightRecord = 0;
+      localStorage.removeItem('parfait_best_height');
+    }
+    let isNewRecordAchievedInSession = false;
+
+    function resizeStage() {
+      const rect = stageWrap.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      stageCanvas.width = rect.width * dpr;
+      stageCanvas.height = rect.height * dpr;
+      stageCtx.scale(dpr, dpr);
+      updateCupGeometry();
+    }
+    window.addEventListener('resize', resizeStage);
+
+    function updateCupGeometry() {
+      const rect = stageWrap.getBoundingClientRect();
+      cupGeom = ParfaitPhysics.computeCupGeometry(selectedCup, rect.width, rect.height);
+    }
+
+    function spawnIngredient(ingId) {
+      const ing = ParfaitGameLogic.INGREDIENTS.find(i => i.id === ingId);
+      if (!ing || !cupGeom) return;
+
+      const rect = stageWrap.getBoundingClientRect();
+      const cx = rect.width / 2;
+      const startX = cx + (Math.random() - 0.5) * 40;
+      const startY = 30;
+
+      const body = ParfaitPhysics.createBody(ing, startX, startY, {
+        vx: (Math.random() - 0.5) * 1.5,
+        vy: 2.5,
+        rot: (Math.random() - 0.5) * 0.4,
+        vRot: (Math.random() - 0.5) * 0.08
+      });
+
+      bodies.push(body);
+      sound.playPop(1 + bodies.length * 0.05);
+    }
+
+    // 目盛り線（ものさしルーラー）とベスト記録ラインの描画
+    function drawRulerAndRecord(rect, bottomY) {
+      const rulerX = rect.width - 32;
+
+      stageCtx.save();
+      // ルーラー背景ガイドライン
+      stageCtx.strokeStyle = 'rgba(255, 140, 180, 0.35)';
+      stageCtx.lineWidth = 2;
+      stageCtx.beginPath();
+      stageCtx.moveTo(rulerX, 20);
+      stageCtx.lineTo(rulerX, bottomY);
+      stageCtx.stroke();
+
+      // 5cm / 10cm ごとの目盛り
+      const maxCm = Math.floor(bottomY / PX_PER_CM);
+      for (let cm = 5; cm <= maxCm; cm += 5) {
+        const y = bottomY - cm * PX_PER_CM;
+        if (y < 20) break;
+
+        const isMajor = cm % 10 === 0;
+        stageCtx.strokeStyle = isMajor ? 'rgba(255, 80, 140, 0.7)' : 'rgba(255, 160, 190, 0.45)';
+        stageCtx.lineWidth = isMajor ? 2.5 : 1.5;
+
+        stageCtx.beginPath();
+        stageCtx.moveTo(isMajor ? rulerX - 12 : rulerX - 6, y);
+        stageCtx.lineTo(rulerX + 4, y);
+        stageCtx.stroke();
+
+        if (isMajor) {
+          stageCtx.font = "900 11px 'M PLUS Rounded 1c', sans-serif";
+          stageCtx.fillStyle = '#ff4d88';
+          stageCtx.textAlign = 'right';
+          stageCtx.textBaseline = 'middle';
+          stageCtx.fillText(`${cm}`, rulerX - 15, y);
+        }
+      }
+
+      // ベスト記録ラインの描画（bestHeightRecord > 0 のとき）
+      if (bestHeightRecord > 0) {
+        const bestY = bottomY - bestHeightRecord * PX_PER_CM;
+        if (bestY > 20) {
+          stageCtx.strokeStyle = '#ff9900';
+          stageCtx.lineWidth = 2;
+          stageCtx.setLineDash([6, 4]);
+          stageCtx.beginPath();
+          stageCtx.moveTo(20, bestY);
+          stageCtx.lineTo(rect.width - 20, bestY);
+          stageCtx.stroke();
+          stageCtx.setLineDash([]);
+
+          // 👑 ベストバッジ
+          stageCtx.fillStyle = '#ff9900';
+          stageCtx.beginPath();
+          stageCtx.roundRect(rect.width - 110, bestY - 10, 85, 20, 10);
+          stageCtx.fill();
+
+          stageCtx.font = "900 10px 'M PLUS Rounded 1c', sans-serif";
+          stageCtx.fillStyle = '#fff';
+          stageCtx.textAlign = 'center';
+          stageCtx.textBaseline = 'middle';
+          stageCtx.fillText(`👑 ${bestHeightRecord}cm`, rect.width - 67, bestY);
+        }
+      }
+
+      // 現在の高さライン（トッピングがある場合）
+      if (currentHeightCm > 0) {
+        const curY = bottomY - currentHeightCm * PX_PER_CM;
+        if (curY > 15) {
+          stageCtx.strokeStyle = 'rgba(255, 60, 120, 0.45)';
+          stageCtx.lineWidth = 1.5;
+          stageCtx.setLineDash([3, 3]);
+          stageCtx.beginPath();
+          stageCtx.moveTo(30, curY);
+          stageCtx.lineTo(rect.width - 45, curY);
+          stageCtx.stroke();
+          stageCtx.setLineDash([]);
+        }
+      }
+
+      stageCtx.restore();
+    }
+
+    function drawStage() {
+      const rect = stageWrap.getBoundingClientRect();
+      stageCtx.clearRect(0, 0, rect.width, rect.height);
+
+      if (!cupGeom) return;
+      const cup = selectedCup;
+      const { cx, cy, topY, bottomY, leftTopX, rightTopX, leftBotX, rightBotX } = cupGeom;
+
+      // ものさしルーラー＆記録ラインを描画（背景側）
+      drawRulerAndRecord(rect, bottomY);
+
+      // 1. カップの脚と台座
+      stageCtx.save();
+      stageCtx.fillStyle = '#b8e8f8';
+      stageCtx.strokeStyle = cup.rimColor;
+      stageCtx.lineWidth = 4;
+      stageCtx.beginPath();
+      stageCtx.roundRect(cx - cup.baseWidth / 2, cy + cup.stemHeight, cup.baseWidth, 14, 7);
+      stageCtx.fill();
+      stageCtx.stroke();
+
+      stageCtx.fillStyle = '#c8effc';
+      stageCtx.fillRect(cx - 8, cy, 16, cup.stemHeight);
+      stageCtx.strokeRect(cx - 8, cy, 16, cup.stemHeight);
+      stageCtx.restore();
+
+      // 2. トッピング描画（巨大絵文字）
+      for (let b of bodies) {
+        stageCtx.save();
+        stageCtx.translate(b.x, b.y);
+        stageCtx.rotate(b.rot);
+
+        stageCtx.shadowColor = 'rgba(0,0,0,0.12)';
+        stageCtx.shadowBlur = 6;
+        stageCtx.shadowOffsetY = 4;
+
+        const fontSize = Math.floor(b.radius * 2.1);
+        stageCtx.font = `${fontSize}px 'M PLUS Rounded 1c', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif`;
+        stageCtx.textAlign = 'center';
+        stageCtx.textBaseline = 'middle';
+        stageCtx.fillText(b.icon, 0, 0);
+
+        stageCtx.restore();
+      }
+
+      // 3. カップのガラス
+      stageCtx.save();
+      stageCtx.fillStyle = cup.glassColor;
+      stageCtx.strokeStyle = cup.rimColor;
+      stageCtx.lineWidth = 5;
+      stageCtx.lineJoin = 'round';
+
+      stageCtx.beginPath();
+      stageCtx.moveTo(leftTopX, topY);
+      stageCtx.lineTo(leftBotX, bottomY);
+      stageCtx.lineTo(rightBotX, bottomY);
+      stageCtx.lineTo(rightTopX, topY);
+      stageCtx.closePath();
+      stageCtx.fill();
+      stageCtx.stroke();
+
+      // ガラス光沢
+      stageCtx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+      stageCtx.lineWidth = 4;
+      stageCtx.beginPath();
+      stageCtx.moveTo(leftTopX + 8, topY + 12);
+      stageCtx.lineTo(leftBotX + 8, bottomY - 10);
+      stageCtx.stroke();
+
+      stageCtx.restore();
+    }
+
+    function stageLoop() {
+      if (cupGeom) {
+        const res = ParfaitPhysics.stepSimulation(bodies, cupGeom, { subSteps: 6 });
+        if (res.spilledCount > 0) {
+          sound.playFall();
+          showStageToast('あっ！こぼれちゃった！💦');
+        }
+
+        const rect = stageWrap.getBoundingClientRect();
+        bodies = bodies.filter(b => b.y < rect.height + 60);
+
+        // リアルタイム高さ計算
+        currentHeightCm = ParfaitGameLogic.calculateHeight(bodies, cupGeom.bottomY, PX_PER_CM);
+
+        if (State.mode === 'height') {
+          document.getElementById('live-height-text').textContent = `${currentHeightCm}cm`;
+
+          // 新記録判定（currentHeightCm > 0 かつ 着地・安定したタワーの高さのみ）
+          if (currentHeightCm > 0 && ParfaitGameLogic.checkNewRecord(currentHeightCm, bestHeightRecord)) {
+            bestHeightRecord = currentHeightCm;
+            localStorage.setItem('parfait_best_height', bestHeightRecord.toString());
+            document.getElementById('live-best-badge').textContent = `👑 ベスト：${bestHeightRecord}cm`;
+            updateTitleBestRecord();
+
+            if (!isNewRecordAchievedInSession && currentHeightCm >= 10) {
+              isNewRecordAchievedInSession = true;
+              sound.playRecord();
+              fireConfetti();
+              showStageToast('🌟 しんきろく たっせい！！ 🎉', true);
+            }
+          }
+        }
+      }
+
+      drawStage();
+      requestAnimationFrame(stageLoop);
+    }
+
+    /* ==========================================================
+       4. ゲームステート・UI管理
+       ========================================================== */
+    const State = {
+      mode: 'title', // 'shop' | 'height' | 'free'
+      customerTurn: 0,
+      maxCustomers: 3,
+      currentCustomer: null,
+      order: [],
+      totalScore: 0
+    };
+
+    const screenTitle = document.getElementById('screen-title');
+    const screenGame = document.getElementById('screen-game');
+    const screenResult = document.getElementById('screen-result');
+    const btnSoundToggle = document.getElementById('btn-sound-toggle');
+    const btnHome = document.getElementById('btn-home');
+    const badgeText = document.getElementById('badge-text');
+    const customerPanel = document.getElementById('customer-panel');
+    const heightChallengePanel = document.getElementById('height-challenge-panel');
+    const customerAvatar = document.getElementById('customer-avatar');
+    const customerName = document.getElementById('customer-name');
+    const orderItems = document.getElementById('order-items');
+    const palette = document.getElementById('palette');
+    const btnUndo = document.getElementById('btn-undo');
+    const btnClear = document.getElementById('btn-clear');
+    const btnServe = document.getElementById('btn-serve');
+    const stageToast = document.getElementById('stage-toast');
+    const modalCups = document.getElementById('modal-cups');
+    const modalCupList = document.getElementById('modal-cup-list');
+    const btnCloseModal = document.getElementById('btn-close-modal');
+    const currentCupNameLabel = document.getElementById('current-cup-name-label');
+    const stageCupName = document.getElementById('stage-cup-name');
+    const titleCupDisplay = document.getElementById('title-cup-display');
+    const titleBestRecordText = document.getElementById('title-best-record-text');
+    const newRecordCardBanner = document.getElementById('new-record-card-banner');
+
+    function updateTitleBestRecord() {
+      titleBestRecordText.textContent = `さいこうきろく：${bestHeightRecord}cm`;
+    }
+
+    function showStageToast(text, isRecord = false) {
+      stageToast.textContent = text;
+      if (isRecord) stageToast.classList.add('record');
+      else stageToast.classList.remove('record');
+      stageToast.classList.add('show');
+      setTimeout(() => stageToast.classList.remove('show'), 1600);
+    }
+
+    function createPalette() {
+      palette.innerHTML = '';
+      ParfaitGameLogic.INGREDIENTS.forEach(item => {
+        const btn = document.createElement('button');
+        btn.className = `ing-btn ${item.isNeta ? 'neta' : ''}`;
+        btn.innerHTML = `
+          <span class="icon">${item.icon}</span>
+          <span class="name">${item.name}</span>
+        `;
+        btn.addEventListener('click', () => spawnIngredient(item.id));
+        palette.appendChild(btn);
+      });
+    }
+
+    function switchScreen(screen) {
+      [screenTitle, screenGame, screenResult].forEach(s => s.classList.remove('active'));
+      screen.classList.add('active');
+      if (screen === screenTitle) {
+        btnHome.style.display = 'none';
+        badgeText.textContent = 'パフェやさん';
+        bodies = [];
+        currentHeightCm = 0;
+        updateTitleBestRecord();
+      } else {
+        btnHome.style.display = 'flex';
+      }
+      setTimeout(resizeStage, 50);
+    }
+
+    function startShopMode() {
+      sound.init();
+      sound.startBgm();
+      State.mode = 'shop';
+      State.customerTurn = 0;
+      State.totalScore = 0;
+      bodies = [];
+      customerPanel.style.display = 'flex';
+      heightChallengePanel.style.display = 'none';
+      btnServe.innerHTML = '<span>✨</span> はい、どうぞ！';
+      badgeText.textContent = `おみせやさん (1/${State.maxCustomers})`;
+      switchScreen(screenGame);
+      nextCustomer();
+    }
+
+    function startHeightMode() {
+      sound.init();
+      sound.startBgm();
+      State.mode = 'height';
+      bodies = [];
+      isNewRecordAchievedInSession = false;
+      customerPanel.style.display = 'none';
+      heightChallengePanel.style.display = 'flex';
+      document.getElementById('live-height-text').textContent = '0cm';
+      document.getElementById('live-best-badge').textContent = `👑 ベスト：${bestHeightRecord}cm`;
+      btnServe.innerHTML = '<span>📸</span> きろくを のこす！';
+      badgeText.textContent = 'たかさチャレンジ！';
+      switchScreen(screenGame);
+    }
+
+    function startFreeMode() {
+      sound.init();
+      sound.startBgm();
+      State.mode = 'free';
+      bodies = [];
+      customerPanel.style.display = 'none';
+      heightChallengePanel.style.display = 'none';
+      btnServe.innerHTML = '<span>📸</span> できた！（しゃしん）';
+      badgeText.textContent = 'じゆうに つくるモード';
+      switchScreen(screenGame);
+    }
+
+    function nextCustomer() {
+      State.customerTurn++;
+      badgeText.textContent = `おみせやさん (${State.customerTurn}/${State.maxCustomers})`;
+      bodies = [];
+
+      const cust = ParfaitGameLogic.CUSTOMERS[Math.floor(Math.random() * ParfaitGameLogic.CUSTOMERS.length)];
+      State.currentCustomer = cust;
+      customerAvatar.textContent = cust.avatar;
+      customerAvatar.className = 'customer-avatar';
+      customerName.textContent = `${cust.name} の ちゅうもん`;
+
+      State.order = ParfaitGameLogic.generateOrder(State.customerTurn, ParfaitGameLogic.INGREDIENTS);
+
+      orderItems.innerHTML = '';
+      State.order.forEach((id, idx) => {
+        const ing = ParfaitGameLogic.INGREDIENTS.find(i => i.id === id);
+        const chip = document.createElement('div');
+        chip.className = 'order-item-chip';
+        chip.textContent = ing.icon;
+        orderItems.appendChild(chip);
+        if (idx < State.order.length - 1) {
+          const arrow = document.createElement('span');
+          arrow.className = 'order-arrow';
+          arrow.textContent = '➔';
+          orderItems.appendChild(arrow);
+        }
+      });
+    }
+
+    function submitParfait() {
+      const inCupBodies = bodies.filter(b => b.inCup);
+
+      // たかさチャレンジモードの完了
+      if (State.mode === 'height') {
+        if (inCupBodies.length === 0) {
+          showStageToast('トッピングを のせてね！🍨');
+          return;
+        }
+        sound.playSuccess();
+        fireConfetti();
+        showHeightResult();
+        return;
+      }
+
+      // フリーモードの完了
+      if (State.mode === 'free') {
+        if (inCupBodies.length === 0) {
+          showStageToast('なにか トッピングしてね！🍧');
+          return;
+        }
+        sound.playSuccess();
+        fireConfetti();
+        showStageToast('すてきなパフェの かんせい！🎉');
+        setTimeout(showFreeResult, 1300);
+        return;
+      }
+
+      // お店屋さんモードの判定
+      const evalResult = ParfaitGameLogic.evaluateParfait(State.order, bodies);
+      if (evalResult.status === 'empty' || evalResult.status === 'falling') {
+        showStageToast(evalResult.message);
+        return;
+      }
+
+      if (evalResult.soundType === 'success') {
+        sound.playSuccess();
+        fireConfetti();
+      } else if (evalResult.soundType === 'good') {
+        sound.playGood();
+      } else {
+        sound.playFunny();
+      }
+
+      customerAvatar.classList.add(evalResult.reactionType);
+      showStageToast(evalResult.message);
+      State.totalScore += evalResult.score;
+
+      setTimeout(() => {
+        if (State.customerTurn < State.maxCustomers) {
+          nextCustomer();
+        } else {
+          showShopResult();
+        }
+      }, 1600);
+    }
+
+    function showHeightResult() {
+      document.getElementById('result-badge-text').textContent = 'たかさきろく はっぴょう！';
+      document.getElementById('result-title-text').textContent = 'パフェタワー かんせい！';
+      document.getElementById('result-score').textContent = `${currentHeightCm} cm`;
+
+      const rank = ParfaitGameLogic.getHeightRank(currentHeightCm);
+      document.getElementById('result-stars').textContent = rank.stars;
+      document.getElementById('result-rank').textContent = rank.title;
+
+      if (isNewRecordAchievedInSession) {
+        newRecordCardBanner.style.display = 'block';
+      } else {
+        newRecordCardBanner.style.display = 'none';
+      }
+
+      document.getElementById('cup-unlock-banner').style.display = 'none';
+      switchScreen(screenResult);
+    }
+
+    function showShopResult() {
+      sound.playSuccess();
+      fireConfetti();
+      totalClears++;
+
+      const newlyUnlocked = ParfaitGameLogic.checkCupUnlock(totalClears, ParfaitGameLogic.CUPS);
+      const banner = document.getElementById('cup-unlock-banner');
+      if (newlyUnlocked) {
+        banner.style.display = 'flex';
+        document.getElementById('unlock-cup-icon').textContent = newlyUnlocked.icon;
+        document.getElementById('unlock-cup-name').textContent = newlyUnlocked.name;
+        selectCup(newlyUnlocked.id);
+      } else {
+        banner.style.display = 'none';
+      }
+
+      newRecordCardBanner.style.display = 'none';
+      document.getElementById('result-badge-text').textContent = 'けっかはっぴょう！';
+      document.getElementById('result-title-text').textContent = 'ごちそうさまでした！';
+      document.getElementById('result-score').textContent = `${State.totalScore} てん`;
+
+      const rank = ParfaitGameLogic.getShopRank(State.totalScore);
+      document.getElementById('result-stars').textContent = rank.stars;
+      document.getElementById('result-rank').textContent = rank.title;
+
+      switchScreen(screenResult);
+    }
+
+    function showFreeResult() {
+      const inCupBodies = bodies.filter(b => b.inCup);
+      const res = ParfaitGameLogic.getFreeResult(inCupBodies.length);
+      newRecordCardBanner.style.display = 'none';
+      document.getElementById('result-badge-text').textContent = 'じゆうにつくったよ！';
+      document.getElementById('result-title-text').textContent = 'とくせいパフェ かんせい！';
+      document.getElementById('result-stars').textContent = res.stars;
+      document.getElementById('result-score').textContent = res.scoreText;
+      document.getElementById('result-rank').textContent = res.title;
+      document.getElementById('cup-unlock-banner').style.display = 'none';
+      switchScreen(screenResult);
+    }
+
+    function selectCup(cupId) {
+      const cup = ParfaitGameLogic.CUPS.find(c => c.id === cupId);
+      if (!cup || !cup.unlocked) return;
+      selectedCup = cup;
+      currentCupNameLabel.textContent = `いまのカップ：${cup.name}`;
+      stageCupName.textContent = cup.shortName;
+      titleCupDisplay.textContent = cup.icon;
+      updateCupGeometry();
+      renderModalCupList();
+    }
+
+    function renderModalCupList() {
+      modalCupList.innerHTML = '';
+      ParfaitGameLogic.CUPS.forEach(cup => {
+        const card = document.createElement('div');
+        card.className = `cup-card ${cup.id === selectedCup.id ? 'selected' : ''} ${!cup.unlocked ? 'locked' : ''}`;
+        card.innerHTML = `
+          <div class="cup-card-icon">${cup.unlocked ? cup.icon : '🔒'}</div>
+          <div class="cup-card-details">
+            <div class="cup-card-name">${cup.name}</div>
+            <div class="cup-card-desc">${cup.unlocked ? cup.desc : `クリア ${cup.reqClear}かい で ゲット！`}</div>
+          </div>
+        `;
+        if (cup.unlocked) {
+          card.addEventListener('click', () => {
+            sound.playClick();
+            selectCup(cup.id);
+            modalCups.classList.remove('open');
+          });
+        }
+        modalCupList.appendChild(card);
+      });
+    }
+
+    /* ==========================================================
+       5. イベント設定
+       ========================================================== */
+    document.getElementById('btn-start-shop').addEventListener('click', () => {
+      sound.playClick();
+      startShopMode();
+    });
+
+    document.getElementById('btn-start-height').addEventListener('click', () => {
+      sound.playClick();
+      startHeightMode();
+    });
+
+    document.getElementById('btn-start-free').addEventListener('click', () => {
+      sound.playClick();
+      startFreeMode();
+    });
+
+    btnUndo.addEventListener('click', () => {
+      if (bodies.length > 0) {
+        bodies.pop();
+        sound.playUndo();
+      }
+    });
+
+    btnClear.addEventListener('click', () => {
+      sound.playClick();
+      bodies = [];
+    });
+
+    btnServe.addEventListener('click', submitParfait);
+
+    document.getElementById('btn-retry').addEventListener('click', () => {
+      sound.playClick();
+      if (State.mode === 'shop') startShopMode();
+      else if (State.mode === 'height') startHeightMode();
+      else startFreeMode();
+    });
+
+    document.getElementById('btn-result-home').addEventListener('click', () => {
+      sound.playClick();
+      switchScreen(screenTitle);
+    });
+
+    btnHome.addEventListener('click', () => {
+      sound.playClick();
+      switchScreen(screenTitle);
+    });
+
+    btnSoundToggle.addEventListener('click', () => {
+      const on = sound.toggle();
+      btnSoundToggle.textContent = on ? '🔔' : '🔕';
+    });
+
+    document.getElementById('btn-reset-record').addEventListener('click', (e) => {
+      e.stopPropagation();
+      sound.playClick();
+      bestHeightRecord = 0;
+      localStorage.removeItem('parfait_best_height');
+      updateTitleBestRecord();
+      showStageToast('きろくを リセットしたよ！');
+    });
+
+    const openModal = () => {
+      sound.playClick();
+      renderModalCupList();
+      modalCups.classList.add('open');
+    };
+    document.getElementById('btn-cup-modal').addEventListener('click', openModal);
+    document.getElementById('btn-open-cups').addEventListener('click', openModal);
+    btnCloseModal.addEventListener('click', () => modalCups.classList.remove('open'));
+
+    // 初期化実行
+    createPalette();
+    updateTitleBestRecord();
+    selectCup('cup1');
+    resizeStage();
+    requestAnimationFrame(stageLoop);
+  </script>
+</body>
+</html>

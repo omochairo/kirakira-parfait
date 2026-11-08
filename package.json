@@ -1,0 +1,21 @@
+{
+  "name": "kirakira-parfait",
+  "version": "1.0.0",
+  "description": "つくろう！どうぶつもりの キラキラパフェやさん - 小学校低学年向けクッキング＆パフェタワー物理パズルゲーム",
+  "main": "index.html",
+  "scripts": {
+    "test": "node --test --experimental-test-coverage",
+    "debug:rotation": "node check-rotation.js",
+    "debug:rim": "node rim-debug-simulation.js",
+    "debug:tower": "node verify-choco-tower.js"
+  },
+  "keywords": [
+    "game",
+    "physics",
+    "canvas",
+    "web-audio",
+    "educational"
+  ],
+  "author": "",
+  "license": "MIT"
+}

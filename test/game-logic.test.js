@@ -1,0 +1,229 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const ParfaitGameLogic = require('../src/game-logic.js');
+
+test('generateOrder: 正しく注文が生成されネタ食材が含まれないこと', () => {
+  // 通常ターン (turn 1 -> 3個)
+  const order1 = ParfaitGameLogic.generateOrder(1);
+  assert.equal(order1.length, 3);
+  assert.ok(order1.every(id => id !== 'takoyaki' && id !== 'curry'));
+
+  // 3ターン目 (turn 3 -> 4個)
+  const order3 = ParfaitGameLogic.generateOrder(3);
+  assert.equal(order3.length, 4);
+
+  // カスタム個数指定
+  const orderCustom = ParfaitGameLogic.generateOrder(1, ParfaitGameLogic.INGREDIENTS, 5);
+  assert.equal(orderCustom.length, 5);
+});
+
+test('evaluateParfait: 空中落下中の剛体がある場合およびグラスが空の場合の判定', () => {
+  // 1. 空中落下中の剛体がある場合
+  const fallingBodies = [
+    { id: 'vanilla', inCup: true, isGrounded: false },
+    { id: 'strawberry', inCup: true, isGrounded: true }
+  ];
+  const resFalling = ParfaitGameLogic.evaluateParfait(['vanilla', 'strawberry'], fallingBodies);
+  assert.equal(resFalling.status, 'falling');
+  assert.equal(resFalling.score, 0);
+  assert.ok(resFalling.message.includes('おちてくるのを'));
+
+  // 2. 剛体ゼロ
+  const resEmpty = ParfaitGameLogic.evaluateParfait(['vanilla', 'strawberry'], []);
+  assert.equal(resEmpty.status, 'empty');
+  assert.equal(resEmpty.score, 0);
+  assert.equal(resEmpty.reactionType, 'none');
+
+  // 3. inCupがfalseの剛体しかない場合
+  const spilledBodies = [{ id: 'vanilla', inCup: false, isGrounded: false }];
+  const resSpilled = ParfaitGameLogic.evaluateParfait(['vanilla'], spilledBodies);
+  assert.equal(resSpilled.status, 'empty');
+});
+
+test('evaluateParfait: 完全一致（100点・だいせいこう）', () => {
+  const order = ['vanilla', 'strawberry', 'cherry'];
+  const bodies = [
+    { id: 'vanilla', isNeta: false, inCup: true, isGrounded: true },
+    { id: 'strawberry', isNeta: false, inCup: true, isGrounded: true },
+    { id: 'cherry', isNeta: false, inCup: true, isGrounded: true }
+  ];
+  const res = ParfaitGameLogic.evaluateParfait(order, bodies);
+  assert.equal(res.status, 'perfect');
+  assert.equal(res.score, 100);
+  assert.equal(res.reactionType, 'bounce');
+  assert.equal(res.soundType, 'success');
+  assert.ok(res.message.includes('100てん'));
+});
+
+test('evaluateParfait: おしい判定（70点・順番違いまたは1個違い）', () => {
+  const order = ['vanilla', 'strawberry', 'cherry'];
+  // 順番違い
+  const bodiesShuffled = [
+    { id: 'cherry', isNeta: false, inCup: true, isGrounded: true },
+    { id: 'vanilla', isNeta: false, inCup: true, isGrounded: true },
+    { id: 'strawberry', isNeta: false, inCup: true, isGrounded: true }
+  ];
+  const res1 = ParfaitGameLogic.evaluateParfait(order, bodiesShuffled);
+  assert.equal(res1.status, 'good');
+  assert.equal(res1.score, 70);
+  assert.equal(res1.reactionType, 'bounce');
+  assert.equal(res1.soundType, 'good');
+
+  // 1個だけ違う（3個中2個一致）
+  const bodiesOneOff = [
+    { id: 'vanilla', isNeta: false, inCup: true, isGrounded: true },
+    { id: 'strawberry', isNeta: false, inCup: true, isGrounded: true },
+    { id: 'melon', isNeta: false, inCup: true, isGrounded: true }
+  ];
+  const res2 = ParfaitGameLogic.evaluateParfait(order, bodiesOneOff);
+  assert.equal(res2.status, 'good');
+  assert.equal(res2.score, 70);
+});
+
+test('evaluateParfait: へんてこ判定（ネタ食材入り、または大きく異なる）', () => {
+  const order = ['vanilla', 'strawberry', 'cherry'];
+
+  // ネタ食材（たこやき）が入っている場合
+  const bodiesWithNeta = [
+    { id: 'vanilla', isNeta: false, inCup: true, isGrounded: true },
+    { id: 'strawberry', isNeta: false, inCup: true, isGrounded: true },
+    { id: 'takoyaki', isNeta: true, inCup: true, isGrounded: true }
+  ];
+  const resNeta = ParfaitGameLogic.evaluateParfait(order, bodiesWithNeta);
+  assert.equal(resNeta.status, 'funny');
+  assert.equal(resNeta.score, 50);
+  assert.equal(resNeta.reactionType, 'dizzy');
+  assert.equal(resNeta.soundType, 'funny');
+  assert.ok(resNeta.message.includes('へんてこ'));
+
+  // ネタ食材はないが全然違う材料ばかり
+  const bodiesMismatch = [
+    { id: 'melon', isNeta: false, inCup: true, isGrounded: true },
+    { id: 'choco', isNeta: false, inCup: true, isGrounded: true }
+  ];
+  const resMismatch = ParfaitGameLogic.evaluateParfait(order, bodiesMismatch);
+  assert.equal(resMismatch.status, 'funny');
+  assert.equal(resMismatch.score, 50);
+  assert.ok(resMismatch.message.includes('ふしぎなあじ'));
+});
+
+test('checkCupUnlock: カップの解放判定', () => {
+  const cups = [
+    { id: 'c1', unlocked: true, reqClear: 0 },
+    { id: 'c2', unlocked: false, reqClear: 1 },
+    { id: 'c3', unlocked: false, reqClear: 2 }
+  ];
+
+  // クリア回数0 -> 新規解放なし
+  assert.equal(ParfaitGameLogic.checkCupUnlock(0, cups), null);
+
+  // クリア回数1 -> c2が解放
+  const unlocked = ParfaitGameLogic.checkCupUnlock(1, cups);
+  assert.notEqual(unlocked, null);
+  assert.equal(unlocked.id, 'c2');
+  assert.equal(cups[1].unlocked, true);
+
+  // 既に解放済みの状態で再度チェック -> null
+  assert.equal(ParfaitGameLogic.checkCupUnlock(1, cups), null);
+});
+
+test('getShopRank: スコアごとの称号判定', () => {
+  // 300点以上
+  const rank300 = ParfaitGameLogic.getShopRank(300);
+  assert.equal(rank300.stars, '⭐⭐⭐');
+  assert.ok(rank300.title.includes('でんせつ'));
+
+  // 200〜299点
+  const rank200 = ParfaitGameLogic.getShopRank(200);
+  assert.equal(rank200.stars, '⭐⭐');
+  assert.ok(rank200.title.includes('にんきもの'));
+
+  // 200点未満
+  const rank100 = ParfaitGameLogic.getShopRank(150);
+  assert.equal(rank100.stars, '⭐');
+  assert.ok(rank100.title.includes('おもしろ'));
+});
+
+test('getFreeResult: じゆうにつくるモードの称号判定', () => {
+  const res = ParfaitGameLogic.getFreeResult(8);
+  assert.equal(res.stars, '✨🍨✨');
+  assert.equal(res.scoreText, '8こ のったよ！');
+  assert.ok(res.title.includes('せかいに ひとつだけ'));
+});
+
+test('calculateHeight: 空中落下中の剛体は無視され、着地・静止した剛体のみ計測されること', () => {
+  const cupBottomY = 500;
+
+  // 1. 剛体ゼロ件
+  assert.equal(ParfaitGameLogic.calculateHeight([], cupBottomY), 0);
+
+  // 2. 空中落下中（isGrounded: false または vy が大きい）
+  // 画面最上部 (y=30) で落とした直後の剛体
+  const bSpawning = [{ y: 30, radius: 28, inCup: true, isGrounded: false, vy: 2.5 }];
+  assert.equal(ParfaitGameLogic.calculateHeight(bSpawning, cupBottomY), 0, '落とした直後の空中にある剛体は0cmでなければならない');
+
+  // 3. 接地しているがまだ高速で跳ねている最中 (Math.abs(vy) >= 1.5)
+  const bBouncing = [{ y: 400, radius: 28, inCup: true, isGrounded: true, vy: 3.0 }];
+  assert.equal(ParfaitGameLogic.calculateHeight(bBouncing, cupBottomY), 0, '跳ねている最中の剛体は計測されない');
+
+  // 4. 正しく着地・静止した剛体 (isGrounded: true, Math.abs(vy) < 1.5)
+  // y = 400, radius = 20 -> topY = 380, diffPx = 120 -> 120 / 6 = 20cm
+  const bSettled = [{ y: 400, radius: 20, inCup: true, isGrounded: true, vy: 0.2 }];
+  assert.equal(ParfaitGameLogic.calculateHeight(bSettled, cupBottomY), 20);
+
+  // 5. 複数剛体（空中剛体と着地剛体が混在）
+  const bMixed = [
+    { y: 450, radius: 25, inCup: true, isGrounded: true, vy: 0.1 },  // topY = 425
+    { y: 320, radius: 20, inCup: true, isGrounded: true, vy: -0.5 }, // topY = 300 -> diffPx = 200 -> 33cm
+    { y: 30, radius: 28, inCup: true, isGrounded: false, vy: 3.0 },  // 落下中の新しい剛体（無視される）
+    { y: 200, radius: 20, inCup: false, isGrounded: false, vy: 0 }   // こぼれた剛体（無視される）
+  ];
+  assert.equal(ParfaitGameLogic.calculateHeight(bMixed, cupBottomY), 33);
+
+  // 6. vy が undefined の場合 (フォールバック)
+  const bNoVy = [{ y: 400, radius: 20, inCup: true, isGrounded: true }];
+  assert.equal(ParfaitGameLogic.calculateHeight(bNoVy, cupBottomY), 20);
+
+  // 7. カスタム pxPerCm 指定
+  assert.equal(ParfaitGameLogic.calculateHeight(bSettled, cupBottomY, 10), 12);
+
+  // 8. 底面より下にいる極端な剛体 (diffPx <= 0)
+  const bBelow = [{ y: 550, radius: 10, inCup: true, isGrounded: true, vy: 0 }];
+  assert.equal(ParfaitGameLogic.calculateHeight(bBelow, cupBottomY), 0);
+});
+
+test('checkNewRecord: 新記録更新判定の全分岐', () => {
+  // 更新成功
+  assert.equal(ParfaitGameLogic.checkNewRecord(30, 25), true);
+
+  // 未更新（同じか小さい）
+  assert.equal(ParfaitGameLogic.checkNewRecord(25, 25), false);
+  assert.equal(ParfaitGameLogic.checkNewRecord(20, 25), false);
+
+  // bestRecord が undefined または null
+  assert.equal(ParfaitGameLogic.checkNewRecord(10, undefined), true);
+  assert.equal(ParfaitGameLogic.checkNewRecord(10, null), true);
+  assert.equal(ParfaitGameLogic.checkNewRecord(0, undefined), false);
+});
+
+test('getHeightRank: 高さランク判定の全分岐', () => {
+  // 50cm以上
+  const rank50 = ParfaitGameLogic.getHeightRank(50);
+  assert.equal(rank50.stars, '👑⭐⭐⭐');
+  assert.ok(rank50.title.includes('でんせつ'));
+
+  // 35cm〜49cm
+  const rank35 = ParfaitGameLogic.getHeightRank(35);
+  assert.equal(rank35.stars, '⭐⭐⭐');
+  assert.ok(rank35.title.includes('メガ'));
+
+  // 20cm〜34cm
+  const rank20 = ParfaitGameLogic.getHeightRank(20);
+  assert.equal(rank20.stars, '⭐⭐');
+  assert.ok(rank20.title.includes('たか〜い'));
+
+  // 20cm未満
+  const rank10 = ParfaitGameLogic.getHeightRank(10);
+  assert.equal(rank10.stars, '⭐');
+  assert.ok(rank10.title.includes('プチ'));
+});
