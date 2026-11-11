@@ -110,6 +110,51 @@ const ParfaitGameLogic = (function () {
   }
 
   /**
+   * カップ内に着地・静止している剛体を「したから」の層（レイヤー）順に並べたID配列を返す。
+   * 同じ高さの層（横並び）にある剛体同士は、投入順（配列順）を維持する。
+   */
+  function getSettledOrderIds(currentBodies) {
+    const settledWithIdx = [];
+    for (let i = 0; i < currentBodies.length; i++) {
+      const b = currentBodies[i];
+      if (b.inCup && (b.isGrounded || b.isSettled)) {
+        settledWithIdx.push({ body: b, idx: i });
+      }
+    }
+    if (settledWithIdx.length === 0) return [];
+
+    // y座標の大きい（下にある）順にソート
+    settledWithIdx.sort((a, b) => (b.body.y || 0) - (a.body.y || 0));
+
+    const avgRadius = settledWithIdx.reduce((sum, item) => sum + (item.body.radius || 28), 0) / settledWithIdx.length;
+    const layerThreshold = 0.8 * avgRadius;
+
+    let currentLayer = [settledWithIdx[0]];
+    const layers = [currentLayer];
+    for (let i = 1; i < settledWithIdx.length; i++) {
+      const item = settledWithIdx[i];
+      const firstY = currentLayer[0].body.y || 0;
+      const itemY = item.body.y || 0;
+      if (firstY - itemY < layerThreshold) {
+        currentLayer.push(item);
+      } else {
+        currentLayer = [item];
+        layers.push(currentLayer);
+      }
+    }
+
+    const resultIds = [];
+    for (let i = 0; i < layers.length; i++) {
+      const layer = layers[i];
+      layer.sort((a, b) => a.idx - b.idx);
+      for (let j = 0; j < layer.length; j++) {
+        resultIds.push(layer[j].body.id);
+      }
+    }
+    return resultIds;
+  }
+
+  /**
    * パフェの完成・判定
    */
   function evaluateParfait(order, currentBodies) {
@@ -138,10 +183,9 @@ const ParfaitGameLogic = (function () {
       };
     }
 
-    // 注文は「したから」の順なので、積み上がった物理位置（y座標の大きい＝下にある順）で並べ替える
-    const sortedBodies = [...settledBodies].sort((a, b) => (b.y || 0) - (a.y || 0));
-    const playerIds = sortedBodies.map(b => b.id);
-    const hasNeta = sortedBodies.some(b => b.isNeta);
+    // 注文は「したから」の順なので、層（レイヤー）ベースの順序リストで比較する
+    const playerIds = getSettledOrderIds(currentBodies);
+    const hasNeta = settledBodies.some(b => b.isNeta);
 
     // 1. 完全一致（順番と個数がピッタリ）
     const isPerfect = order.length === playerIds.length &&
@@ -333,6 +377,7 @@ const ParfaitGameLogic = (function () {
     CUSTOMERS,
     PROGRESS_KEY,
     generateOrder,
+    getSettledOrderIds,
     evaluateParfait,
     checkCupUnlock,
     getShopRank,
