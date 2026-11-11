@@ -248,6 +248,17 @@ const ParfaitPhysics = (function () {
         }
       }
 
+      // 4.5 接地している剛体のスリープ減衰（積み上がったタワーの微振動・ジッターを止める）
+      for (let i = 0; i < bodies.length; i++) {
+        const b = bodies[i];
+        if (b.inCup && b.isGrounded) {
+          b.vx *= 0.5;
+          b.vy *= 0.5;
+          if (Math.abs(b.vx) < 0.15) b.vx = 0;
+          if (Math.abs(b.vy) < 0.15) b.vy = 0;
+        }
+      }
+
       // 5. 衝突による押し出し後に、再度底抜け防止クランプを適用
       for (let i = 0; i < bodies.length; i++) {
         clampBodyInCup(bodies[i], geom);

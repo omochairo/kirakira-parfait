@@ -205,6 +205,28 @@ test('stepSimulation: 接地フラグの伝播とシミュレーション', () =
   assert.ok(bSpinAir.vRot > 0.1);
 });
 
+test('stepSimulation: 接地した剛体はスリープ減衰で微振動が止まること', () => {
+  const geom = ParfaitPhysics.computeCupGeometry({ topWidth: 200, bottomWidth: 100, cupHeight: 150 }, 400, 600);
+
+  // 底面に接地した剛体に微小な横揺れと上下動を与えても、スリープ減衰でゼロに固定される
+  const bGrounded = ParfaitPhysics.createBody({ id: 'g', name: 'g', icon: '🍨', radius: 20 }, 200, 540, { vx: 0.2, vy: 0 });
+  ParfaitPhysics.stepSimulation([bGrounded], geom, { subSteps: 2, gravity: 0 });
+  assert.equal(bGrounded.isGrounded, true);
+  assert.equal(bGrounded.vx, 0);
+  assert.equal(bGrounded.vy, 0);
+
+  // 大きめの速度はゼロにはならず、減衰だけされる（空中剛体にはスリープ減衰がかからないことも確認）
+  const bMoving = ParfaitPhysics.createBody({ id: 'm', name: 'm', icon: '🍨', radius: 20 }, 200, 540, { vx: 2.0, vy: 0 });
+  ParfaitPhysics.stepSimulation([bMoving], geom, { subSteps: 1, gravity: 0 });
+  assert.equal(bMoving.isGrounded, true);
+  assert.ok(bMoving.vx > 0 && bMoving.vx < 2.0);
+
+  const bAir = ParfaitPhysics.createBody({ id: 'a', name: 'a', icon: '🍨', radius: 20 }, 200, 200, { vx: 0.2, vy: 0 });
+  ParfaitPhysics.stepSimulation([bAir], geom, { subSteps: 1, gravity: 0 });
+  assert.equal(bAir.isGrounded, false);
+  assert.ok(bAir.vx > 0, '空中剛体の速度はスリープ減衰でゼロにされない');
+});
+
 test('createBody: 全パラメータのデフォルト値とカスタム値', () => {
   // radius なし、options なし
   const b1 = ParfaitPhysics.createBody({ id: 'test1', name: 'テスト1', icon: '🍓' }, 100, 50);

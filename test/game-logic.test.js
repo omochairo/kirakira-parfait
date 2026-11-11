@@ -107,6 +107,107 @@ test('evaluateParfait: へんてこ判定（ネタ食材入り、または大き
   assert.ok(resMismatch.message.includes('ふしぎなあじ'));
 });
 
+test('generateOrder: 同じ材料は最大2個まで（候補が尽きた場合は全体から選ぶ）', () => {
+  // デフォルト食材では、どの材料も2個を超えないこと（ランダムでも構造的に保証される）
+  for (let trial = 0; trial < 200; trial++) {
+    const order = ParfaitGameLogic.generateOrder(3);
+    const counts = {};
+    order.forEach(id => { counts[id] = (counts[id] || 0) + 1; });
+    Object.values(counts).forEach(c => assert.ok(c <= 2));
+  }
+
+  // 通常食材が1種類しかない場合は、候補が尽きても全体から選び続けること
+  const single = [
+    { id: 'vanilla', name: 'バニラ', icon: '🍨', radius: 28, isNeta: false },
+    { id: 'takoyaki', name: 'たこやき', icon: '🐙', radius: 27, isNeta: true }
+  ];
+  const orderSingle = ParfaitGameLogic.generateOrder(1, single, 5);
+  assert.equal(orderSingle.length, 5);
+  assert.ok(orderSingle.every(id => id === 'vanilla'));
+});
+
+test('evaluateParfait: 積み上がり順（したから）で完全一致を判定すること', () => {
+  const order = ['vanilla', 'strawberry', 'cherry'];
+
+  // 落とした順はバラバラでも、物理的に「下から vanilla → strawberry → cherry」なら100点
+  const bodiesStacked = [
+    { id: 'cherry', isNeta: false, inCup: true, isGrounded: true, y: 100 },
+    { id: 'vanilla', isNeta: false, inCup: true, isGrounded: true, y: 300 },
+    { id: 'strawberry', isNeta: false, inCup: true, isGrounded: true, y: 200 }
+  ];
+  const resPerfect = ParfaitGameLogic.evaluateParfait(order, bodiesStacked);
+  assert.equal(resPerfect.status, 'perfect');
+  assert.equal(resPerfect.score, 100);
+
+  // 落とした順が注文通りでも、実際の積み上がり（下から）が違えば完全一致にはならない
+  const bodiesWrongStack = [
+    { id: 'vanilla', isNeta: false, inCup: true, isGrounded: true, y: 100 },
+    { id: 'strawberry', isNeta: false, inCup: true, isGrounded: true, y: 200 },
+    { id: 'cherry', isNeta: false, inCup: true, isGrounded: true, y: 300 }
+  ];
+  const resNotPerfect = ParfaitGameLogic.evaluateParfait(order, bodiesWrongStack);
+  assert.notEqual(resNotPerfect.status, 'perfect');
+  assert.equal(resNotPerfect.status, 'good');
+});
+
+test('evaluateParfait: 材料を大量に入れたごまかしは おしい にならないこと', () => {
+  const order = ['vanilla', 'strawberry', 'cherry'];
+  // 注文の材料は全部入っているが、余分な材料が3個も入っている（合計6個）
+  const bodiesSpam = [
+    { id: 'vanilla', isNeta: false, inCup: true, isGrounded: true, y: 350 },
+    { id: 'strawberry', isNeta: false, inCup: true, isGrounded: true, y: 300 },
+    { id: 'cherry', isNeta: false, inCup: true, isGrounded: true, y: 250 },
+    { id: 'melon', isNeta: false, inCup: true, isGrounded: true, y: 200 },
+    { id: 'banana', isNeta: false, inCup: true, isGrounded: true, y: 150 },
+    { id: 'pudding', isNeta: false, inCup: true, isGrounded: true, y: 100 }
+  ];
+  const res = ParfaitGameLogic.evaluateParfait(order, bodiesSpam);
+  assert.equal(res.status, 'funny');
+  assert.equal(res.score, 50);
+});
+
+test('saveProgress / loadProgress: 進行状況の保存と復元', () => {
+  const fakeStorage = (initial = {}) => {
+    const map = { ...initial };
+    return {
+      getItem: k => (k in map ? map[k] : null),
+      setItem: (k, v) => { map[k] = String(v); },
+      _map: map
+    };
+  };
+  const KEY = ParfaitGameLogic.PROGRESS_KEY;
+
+  // 保存して読み戻せること
+  const s1 = fakeStorage();
+  ParfaitGameLogic.saveProgress(s1, { totalClears: 3, selectedCupId: 'cup3' });
+  assert.deepEqual(ParfaitGameLogic.loadProgress(s1), { totalClears: 3, selectedCupId: 'cup3' });
+
+  // 未指定フィールドは初期値で保存されること
+  const s2 = fakeStorage();
+  ParfaitGameLogic.saveProgress(s2, {});
+  assert.deepEqual(ParfaitGameLogic.loadProgress(s2), { totalClears: 0, selectedCupId: null });
+
+  // 何も保存されていない場合は初期値
+  const s3 = fakeStorage();
+  assert.deepEqual(ParfaitGameLogic.loadProgress(s3), { totalClears: 0, selectedCupId: null });
+
+  // 一部のフィールドだけ保存されている場合は、欠けた分が初期値になること
+  const s4 = fakeStorage({ [KEY]: '{"totalClears":2}' });
+  assert.deepEqual(ParfaitGameLogic.loadProgress(s4), { totalClears: 2, selectedCupId: null });
+
+  // 壊れたJSONの場合は例外なく初期値を返すこと
+  const s5 = fakeStorage({ [KEY]: '{oops' });
+  assert.deepEqual(ParfaitGameLogic.loadProgress(s5), { totalClears: 0, selectedCupId: null });
+
+  // storage自体が例外を投げる環境（プライベートブラウズ等）でも例外なく動作すること
+  const throwingStorage = {
+    getItem: () => { throw new Error('blocked'); },
+    setItem: () => { throw new Error('blocked'); }
+  };
+  assert.deepEqual(ParfaitGameLogic.loadProgress(throwingStorage), { totalClears: 0, selectedCupId: null });
+  assert.doesNotThrow(() => ParfaitGameLogic.saveProgress(throwingStorage, { totalClears: 1, selectedCupId: 'cup2' }));
+});
+
 test('checkCupUnlock: カップの解放判定', () => {
   const cups = [
     { id: 'c1', unlocked: true, reqClear: 0 },
