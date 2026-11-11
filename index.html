@@ -313,6 +313,31 @@
       align-items: center;
       justify-content: center;
       box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      position: relative;
+      transition: background 0.25s, border-color 0.25s, transform 0.25s;
+    }
+
+    .order-item-chip.done {
+      background: #e6ffb8;
+      border-color: #7ed321;
+      transform: scale(1.08);
+    }
+
+    .order-item-chip.done::after {
+      content: '✓';
+      position: absolute;
+      top: -8px;
+      right: -6px;
+      font-size: 11px;
+      font-weight: 900;
+      color: #fff;
+      background: #52c41a;
+      border-radius: 50%;
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .order-arrow {
@@ -1149,7 +1174,10 @@
 
     let bodies = [];
     let selectedCup = ParfaitGameLogic.CUPS[0];
-    let totalClears = 0;
+    // 進行状況（クリア回数・解放済みカップ・選択中カップ）をブラウザに保存して復元する
+    const savedProgress = ParfaitGameLogic.loadProgress(localStorage);
+    let totalClears = savedProgress.totalClears;
+    ParfaitGameLogic.checkCupUnlock(totalClears, ParfaitGameLogic.CUPS);
     let cupGeom = null;
 
     // 高さ・ベスト記録管理
@@ -1366,13 +1394,16 @@
         // リアルタイム高さ計算
         currentHeightCm = ParfaitGameLogic.calculateHeight(bodies, cupGeom.bottomY, PX_PER_CM);
 
+        // お店屋さんモード: 注文チップの進捗（あと何が下から順に合っているか）を更新
+        updateOrderProgress();
+
         if (State.mode === 'height') {
           document.getElementById('live-height-text').textContent = `${currentHeightCm}cm`;
 
           // 新記録判定（currentHeightCm > 0 かつ 着地・安定したタワーの高さのみ）
           if (currentHeightCm > 0 && ParfaitGameLogic.checkNewRecord(currentHeightCm, bestHeightRecord)) {
             bestHeightRecord = currentHeightCm;
-            localStorage.setItem('parfait_best_height', bestHeightRecord.toString());
+            try { localStorage.setItem('parfait_best_height', bestHeightRecord.toString()); } catch (e) { /* 保存できない環境では記録なしで続行 */ }
             document.getElementById('live-best-badge').textContent = `👑 ベスト：${bestHeightRecord}cm`;
             updateTitleBestRecord();
 
@@ -1399,7 +1430,8 @@
       maxCustomers: 3,
       currentCustomer: null,
       order: [],
-      totalScore: 0
+      totalScore: 0,
+      isServing: false // 提供ボタン連打による二重加算・二重遷移を防ぐロック
     };
 
     const screenTitle = document.getElementById('screen-title');
@@ -1474,6 +1506,7 @@
       State.mode = 'shop';
       State.customerTurn = 0;
       State.totalScore = 0;
+      State.isServing = false;
       bodies = [];
       customerPanel.style.display = 'flex';
       heightChallengePanel.style.display = 'none';
@@ -1487,6 +1520,7 @@
       sound.init();
       sound.startBgm();
       State.mode = 'height';
+      State.isServing = false;
       bodies = [];
       isNewRecordAchievedInSession = false;
       customerPanel.style.display = 'none';
@@ -1502,6 +1536,7 @@
       sound.init();
       sound.startBgm();
       State.mode = 'free';
+      State.isServing = false;
       bodies = [];
       customerPanel.style.display = 'none';
       heightChallengePanel.style.display = 'none';
@@ -1510,7 +1545,27 @@
       switchScreen(screenGame);
     }
 
+    let orderProgressKey = '';
+
+    // 積み上がった材料（下から順）と注文を比べて、合っているチップに✓を付ける
+    function updateOrderProgress() {
+      if (State.mode !== 'shop') return;
+      const settled = bodies
+        .filter(b => b.inCup && b.isGrounded)
+        .slice()
+        .sort((a, b) => (b.y || 0) - (a.y || 0));
+      const key = settled.map(b => b.id).join(',');
+      if (key === orderProgressKey) return;
+      orderProgressKey = key;
+      const chips = orderItems.querySelectorAll('.order-item-chip');
+      chips.forEach((chip, idx) => {
+        chip.classList.toggle('done', settled[idx] !== undefined && settled[idx].id === State.order[idx]);
+      });
+    }
+
     function nextCustomer() {
+      State.isServing = false;
+      orderProgressKey = '';
       State.customerTurn++;
       badgeText.textContent = `おみせやさん (${State.customerTurn}/${State.maxCustomers})`;
       bodies = [];
@@ -1540,6 +1595,7 @@
     }
 
     function submitParfait() {
+      if (State.isServing) return;
       const inCupBodies = bodies.filter(b => b.inCup);
 
       // たかさチャレンジモードの完了
@@ -1548,6 +1604,7 @@
           showStageToast('トッピングを のせてね！🍨');
           return;
         }
+        State.isServing = true;
         sound.playSuccess();
         fireConfetti();
         showHeightResult();
@@ -1560,6 +1617,7 @@
           showStageToast('なにか トッピングしてね！🍧');
           return;
         }
+        State.isServing = true;
         sound.playSuccess();
         fireConfetti();
         showStageToast('すてきなパフェの かんせい！🎉');
@@ -1583,6 +1641,7 @@
         sound.playFunny();
       }
 
+      State.isServing = true;
       customerAvatar.classList.add(evalResult.reactionType);
       showStageToast(evalResult.message);
       State.totalScore += evalResult.score;
@@ -1619,6 +1678,7 @@
       sound.playSuccess();
       fireConfetti();
       totalClears++;
+      ParfaitGameLogic.saveProgress(localStorage, { totalClears, selectedCupId: selectedCup.id });
 
       const newlyUnlocked = ParfaitGameLogic.checkCupUnlock(totalClears, ParfaitGameLogic.CUPS);
       const banner = document.getElementById('cup-unlock-banner');
@@ -1659,10 +1719,19 @@
     function selectCup(cupId) {
       const cup = ParfaitGameLogic.CUPS.find(c => c.id === cupId);
       if (!cup || !cup.unlocked) return;
+      const cupChanged = selectedCup && cup.id !== selectedCup.id;
       selectedCup = cup;
+      // ゲーム中に別のカップへ替えると積み上がりが崩れるので、材料はまっさらにする
+      if (cupChanged && bodies.length > 0) {
+        bodies = [];
+        if (screenGame.classList.contains('active')) {
+          showStageToast('カップを かえたよ！まっさらな カップで つくろう！🥣');
+        }
+      }
       currentCupNameLabel.textContent = `いまのカップ：${cup.name}`;
       stageCupName.textContent = cup.shortName;
       titleCupDisplay.textContent = cup.icon;
+      ParfaitGameLogic.saveProgress(localStorage, { totalClears, selectedCupId: cup.id });
       updateCupGeometry();
       renderModalCupList();
     }
@@ -1709,9 +1778,13 @@
     });
 
     btnUndo.addEventListener('click', () => {
-      if (bodies.length > 0) {
-        bodies.pop();
-        sound.playUndo();
+      // こぼれた材料ではなく、カップ内にある最後の材料を取り除く
+      for (let i = bodies.length - 1; i >= 0; i--) {
+        if (bodies[i].inCup) {
+          bodies.splice(i, 1);
+          sound.playUndo();
+          break;
+        }
       }
     });
 
@@ -1746,6 +1819,7 @@
 
     document.getElementById('btn-reset-record').addEventListener('click', (e) => {
       e.stopPropagation();
+      if (!window.confirm('さいこうきろくを リセットしますか？')) return;
       sound.playClick();
       bestHeightRecord = 0;
       localStorage.removeItem('parfait_best_height');
@@ -1765,7 +1839,11 @@
     // 初期化実行
     createPalette();
     updateTitleBestRecord();
-    selectCup('cup1');
+    // 保存されていたカップが解放済みなら、それで開始する
+    const initialCupId = ParfaitGameLogic.CUPS.some(c => c.id === savedProgress.selectedCupId && c.unlocked)
+      ? savedProgress.selectedCupId
+      : 'cup1';
+    selectCup(initialCupId);
     resizeStage();
     requestAnimationFrame(stageLoop);
   </script>

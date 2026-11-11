@@ -97,9 +97,14 @@ const ParfaitGameLogic = (function () {
     const normalIngs = ingredients.filter(i => !i.isNeta);
     const recipeLen = count !== null ? count : (3 + (customerTurn === 3 ? 1 : 0));
     const order = [];
+    const counts = {};
     for (let i = 0; i < recipeLen; i++) {
-      const rand = normalIngs[Math.floor(Math.random() * normalIngs.length)];
+      // 同じ材料ばかりの注文にならないよう、各種2個までにする（候補が尽きたら全体から選ぶ）
+      let candidates = normalIngs.filter(ing => (counts[ing.id] || 0) < 2);
+      if (candidates.length === 0) candidates = normalIngs;
+      const rand = candidates[Math.floor(Math.random() * candidates.length)];
       order.push(rand.id);
+      counts[rand.id] = (counts[rand.id] || 0) + 1;
     }
     return order;
   }
@@ -133,8 +138,10 @@ const ParfaitGameLogic = (function () {
       };
     }
 
-    const playerIds = settledBodies.map(b => b.id);
-    const hasNeta = settledBodies.some(b => b.isNeta);
+    // 注文は「したから」の順なので、積み上がった物理位置（y座標の大きい＝下にある順）で並べ替える
+    const sortedBodies = [...settledBodies].sort((a, b) => (b.y || 0) - (a.y || 0));
+    const playerIds = sortedBodies.map(b => b.id);
+    const hasNeta = sortedBodies.some(b => b.isNeta);
 
     // 1. 完全一致（順番と個数がピッタリ）
     const isPerfect = order.length === playerIds.length &&
@@ -161,7 +168,9 @@ const ParfaitGameLogic = (function () {
       matchCount += Math.min(orderCounts[id], playerCounts[id] || 0);
     }
 
-    const isGood = !hasNeta && matchCount >= order.length - 1;
+    // 余分な材料を大量に入れた「ごまかし」は おしい にならないよう、個数にも上限を設ける
+    const hasReasonableCount = playerIds.length <= order.length + 1;
+    const isGood = !hasNeta && hasReasonableCount && matchCount >= order.length - 1;
 
     if (isGood) {
       return {
@@ -284,10 +293,45 @@ const ParfaitGameLogic = (function () {
     };
   }
 
+  const PROGRESS_KEY = 'parfait_progress';
+
+  /**
+   * 進行状況（クリア回数と選択中カップ）の保存
+   * storage は localStorage 互換オブジェクト（getItem/setItem）
+   */
+  function saveProgress(storage, progress) {
+    try {
+      storage.setItem(PROGRESS_KEY, JSON.stringify({
+        totalClears: progress.totalClears || 0,
+        selectedCupId: progress.selectedCupId || null
+      }));
+    } catch (e) {
+      // プライベートブラウズ等で保存できない環境では、ゲーム続行を優先して黙って諦める
+    }
+  }
+
+  /**
+   * 進行状況の読み込み（未保存・壊れたデータの場合は初期値を返す）
+   */
+  function loadProgress(storage) {
+    try {
+      const raw = storage.getItem(PROGRESS_KEY);
+      if (!raw) return { totalClears: 0, selectedCupId: null };
+      const parsed = JSON.parse(raw);
+      return {
+        totalClears: parsed.totalClears || 0,
+        selectedCupId: parsed.selectedCupId || null
+      };
+    } catch (e) {
+      return { totalClears: 0, selectedCupId: null };
+    }
+  }
+
   return {
     INGREDIENTS,
     CUPS,
     CUSTOMERS,
+    PROGRESS_KEY,
     generateOrder,
     evaluateParfait,
     checkCupUnlock,
@@ -295,7 +339,9 @@ const ParfaitGameLogic = (function () {
     getFreeResult,
     calculateHeight,
     checkNewRecord,
-    getHeightRank
+    getHeightRank,
+    saveProgress,
+    loadProgress
   };
 })();
 
