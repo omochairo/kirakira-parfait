@@ -114,7 +114,7 @@ const ParfaitGameLogic = (function () {
    */
   function evaluateParfait(order, currentBodies) {
     // 落下中（空中）のトッピングがあるかチェック
-    const hasFalling = currentBodies.some(b => b.inCup && !b.isGrounded);
+    const hasFalling = currentBodies.some(b => b.inCup && !(b.isGrounded || b.isSettled));
     if (hasFalling) {
       return {
         status: 'falling',
@@ -125,8 +125,8 @@ const ParfaitGameLogic = (function () {
       };
     }
 
-    // カップ内に着地・接地している剛体のみを対象にする
-    const settledBodies = currentBodies.filter(b => b.inCup && b.isGrounded);
+    // カップ内に着地・静止している剛体のみを対象にする
+    const settledBodies = currentBodies.filter(b => b.inCup && (b.isGrounded || b.isSettled));
 
     if (settledBodies.length === 0) {
       return {
@@ -243,8 +243,8 @@ const ParfaitGameLogic = (function () {
    * 現在のパフェの高さをcm単位で計算（着地・安定している剛体のみ）
    */
   function calculateHeight(bodies, cupBottomY, pxPerCm = 6) {
-    // カップ内にあり、かつ接地しており、かつ下向きに高速落下中でない剛体
-    const settled = bodies.filter(b => b.inCup && b.isGrounded && (b.vy === undefined || b.vy < 2.5));
+    // カップ内にあり、かつ接地または静止しており、かつ下向きに高速落下中でない剛体
+    const settled = bodies.filter(b => b.inCup && (b.isGrounded || b.isSettled) && (b.vy === undefined || b.vy < 2.5));
     if (settled.length === 0) return 0;
 
     let highestY = cupBottomY;

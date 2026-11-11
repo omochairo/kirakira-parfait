@@ -1184,11 +1184,6 @@
     const PX_PER_CM = 6;
     let currentHeightCm = 0;
     let bestHeightRecord = parseInt(localStorage.getItem('parfait_best_height') || '0', 10);
-    // 前回のバグによる不正な巨大値（70cm以上）が残っている場合は自動クリーンアップ
-    if (bestHeightRecord > 65) {
-      bestHeightRecord = 0;
-      localStorage.removeItem('parfait_best_height');
-    }
     let isNewRecordAchievedInSession = false;
 
     function resizeStage() {
@@ -1551,7 +1546,7 @@
     function updateOrderProgress() {
       if (State.mode !== 'shop') return;
       const settled = bodies
-        .filter(b => b.inCup && b.isGrounded)
+        .filter(b => b.inCup && (b.isGrounded || b.isSettled))
         .slice()
         .sort((a, b) => (b.y || 0) - (a.y || 0));
       const key = settled.map(b => b.id).join(',');
