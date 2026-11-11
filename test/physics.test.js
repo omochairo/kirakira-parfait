@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const ParfaitPhysics = require('../src/physics.js');
 
-test('computeCupGeometry: 正しく壁と幾何パラメータを計算できること', () => {
+test('computeCupGeometry: 正しく壁と幾何パラメータを計算できること（不正サイズはnull）', () => {
   const dummyCup = {
     topWidth: 200,
     bottomWidth: 100,
@@ -19,6 +19,15 @@ test('computeCupGeometry: 正しく壁と幾何パラメータを計算できる
   assert.equal(geom.leftBotX, 150);
   assert.equal(geom.rightBotX, 250);
   assert.equal(geom.walls.length, 3);
+
+  // stageWidth または stageHeight が正の有限数でない場合は null を返すこと
+  assert.equal(ParfaitPhysics.computeCupGeometry(dummyCup, 0, 600), null);
+  assert.equal(ParfaitPhysics.computeCupGeometry(dummyCup, -100, 600), null);
+  assert.equal(ParfaitPhysics.computeCupGeometry(dummyCup, 400, 0), null);
+  assert.equal(ParfaitPhysics.computeCupGeometry(dummyCup, 400, -50), null);
+  assert.equal(ParfaitPhysics.computeCupGeometry(dummyCup, NaN, 600), null);
+  assert.equal(ParfaitPhysics.computeCupGeometry(dummyCup, 400, Infinity), null);
+  assert.equal(ParfaitPhysics.computeCupGeometry(dummyCup, undefined, 600), null);
 });
 
 test('resolveCircleLineCollision: 線分の端点外(t < 0, t > 1)および中間(0 < t < 1)の判定', () => {
@@ -133,12 +142,13 @@ test('checkSpill: こぼれ落ち判定の全分岐', () => {
   assert.equal(ParfaitPhysics.checkSpill({ inCup: true, x: 200, y: 500 }, geom), false);
 
   // 左外側へ落下
-  const bLeft = { inCup: true, x: geom.leftBotX - 30, y: 500, isGrounded: true, isSettled: true, stillSteps: 36 };
+  const bLeft = { inCup: true, x: geom.leftBotX - 30, y: 500, isGrounded: true, isSettled: true, stillSteps: 36, noContactSteps: 10 };
   assert.equal(ParfaitPhysics.checkSpill(bLeft, geom), true);
   assert.equal(bLeft.inCup, false);
   assert.equal(bLeft.isGrounded, false);
   assert.equal(bLeft.isSettled, false);
   assert.equal(bLeft.stillSteps, 0);
+  assert.equal(bLeft.noContactSteps, 0);
 
   // 右外側へ落下
   const bRight = { inCup: true, x: geom.rightBotX + 30, y: 500, isGrounded: true, isSettled: true, stillSteps: 36 };
@@ -349,6 +359,94 @@ test('stepSimulation: 速度・接触ベースの静止（stillSteps / isSettled
   ParfaitPhysics.stepSimulation([bOut], geom, { subSteps: 40, gravity: 0 });
   assert.equal(bOut.stillSteps, 0);
   assert.equal(bOut.isSettled, false);
+  assert.equal(bOut.noContactSteps, 0);
+});
+
+test('stepSimulation: 支持喪失時の起床（noContactSteps）と通常静止時の非誤起床（600フレーム）', () => {
+  const geom = ParfaitPhysics.computeCupGeometry({ topWidth: 200, bottomWidth: 100, cupHeight: 150 }, 400, 600);
+
+  // 1. 小さな2段スタックを作って完全に静止させた後、下の剛体を取り除くと上の剛体が起きて落下すること
+  const bLower = ParfaitPhysics.createBody({ id: 'vanilla', name: 'バニラ', icon: '🍨', radius: 28 }, geom.cx, 30, { vx: 0, vy: 2.5 });
+  const bUpper = ParfaitPhysics.createBody({ id: 'choco', name: 'チョコ', icon: '🍫', radius: 26 }, geom.cx, 30, { vx: 0, vy: 2.5 });
+  const stack = [bLower];
+  for (let f = 0; f < 100; f++) {
+    ParfaitPhysics.stepSimulation(stack, geom);
+  }
+  stack.push(bUpper);
+  for (let f = 0; f < 120; f++) {
+    ParfaitPhysics.stepSimulation(stack, geom);
+  }
+  assert.equal(bLower.isSettled, true);
+  assert.equal(bUpper.isSettled, true);
+  const settledUpperY = bUpper.y;
+  assert.ok(settledUpperY < geom.bottomY - bUpper.radius - 20, '下の剛体の上に乗っている状態');
+
+  // 下の剛体を取り除く（Undo 等に相当）
+  stack.splice(0, 1);
+
+  // 8フレーム（48サブステップ > 45）進めた時点で noContactSteps により起床していること
+  for (let f = 0; f < 8; f++) {
+    ParfaitPhysics.stepSimulation(stack, geom);
+  }
+  assert.equal(bUpper.isSettled, false, '支持を失った上の剛体が起床すること');
+  assert.equal(bUpper.isGrounded, false);
+  assert.equal(bUpper.stillSteps, 0);
+  assert.ok(bUpper.noContactSteps > 45);
+
+  // さらにフレームを進めると重力でカップ底面まで落下し、底面で再静止すること
+  for (let f = 0; f < 90; f++) {
+    ParfaitPhysics.stepSimulation(stack, geom);
+  }
+  assert.ok(bUpper.y > settledUpperY + 30, '重力で底面まで落下していること');
+  assert.equal(bUpper.isGrounded, true);
+  assert.equal(bUpper.isSettled, true);
+  assert.equal(bUpper.noContactSteps, 0);
+
+  // 2. 伝播により isGrounded=true になった剛体（isSettled=false）や noContactSteps 未定義の剛体も 45超で起床すること
+  const bFloor = {
+    id: 'f', name: 'f', icon: '🍨', radius: 20,
+    x: geom.cx, y: 540, vx: 0, vy: 0, rot: 0, vRot: 0,
+    inCup: true, isGrounded: true, isSettled: true, stillSteps: 40
+  };
+  const bProp = {
+    id: 'p', name: 'p', icon: '🍓', radius: 20,
+    x: geom.cx, y: 499, vx: 0, vy: 0, rot: 0, vRot: 0,
+    inCup: true, isGrounded: false, isSettled: false, stillSteps: 10, noContactSteps: 45
+  };
+  const bFreeAir = {
+    id: 'air', name: 'air', icon: '🍒', radius: 20,
+    x: geom.cx, y: 200, vx: 0, vy: 1, rot: 0, vRot: 0,
+    inCup: true, isGrounded: false, isSettled: false, stillSteps: 0, noContactSteps: 45
+  };
+  ParfaitPhysics.stepSimulation([bFloor, bProp, bFreeAir], geom, { subSteps: 1, gravity: 0 });
+  assert.equal(bFloor.noContactSteps, 1);
+  assert.equal(bProp.noContactSteps, 46);
+  assert.equal(bProp.isGrounded, false);
+  assert.equal(bProp.isSettled, false);
+  assert.equal(bProp.stillSteps, 0);
+  assert.equal(bFreeAir.noContactSteps, 46);
+
+  // 3. 底面およびスタックで通常静止している剛体は 600フレーム経過しても一切誤起床しないこと
+  const bRestBottom = ParfaitPhysics.createBody({ id: 'b1', name: 'b1', icon: '🍨', radius: 28 }, geom.cx, 30, { vx: 0, vy: 2.5 });
+  const bRestTop = ParfaitPhysics.createBody({ id: 'b2', name: 'b2', icon: '🍫', radius: 26 }, geom.cx + 4, 30, { vx: 0, vy: 2.5 });
+  const normalBodies = [bRestBottom];
+  for (let f = 0; f < 90; f++) ParfaitPhysics.stepSimulation(normalBodies, geom);
+  normalBodies.push(bRestTop);
+  for (let f = 0; f < 120; f++) ParfaitPhysics.stepSimulation(normalBodies, geom);
+
+  assert.equal(bRestBottom.isSettled, true);
+  assert.equal(bRestTop.isSettled, true);
+
+  let everWoke = false;
+  for (let f = 0; f < 600; f++) {
+    ParfaitPhysics.stepSimulation(normalBodies, geom);
+    if (!bRestBottom.isSettled || !bRestTop.isSettled) {
+      everWoke = true;
+    }
+  }
+  assert.equal(everWoke, false, '600フレームにわたり通常の静止剛体が誤起床しないこと');
+  assert.equal(bRestBottom.noContactSteps, 0);
+  assert.equal(bRestTop.noContactSteps, 0);
 });
 
 test('createBody: 全パラメータのデフォルト値とカスタム値', () => {
@@ -363,6 +461,7 @@ test('createBody: 全パラメータのデフォルト値とカスタム値', ()
   assert.equal(b1.inCup, true);
   assert.equal(b1.isGrounded, false);
   assert.equal(b1.stillSteps, 0);
+  assert.equal(b1.noContactSteps, 0);
   assert.equal(b1.isSettled, false);
   assert.ok(b1.spawnTime > 0);
 
@@ -370,7 +469,7 @@ test('createBody: 全パラメータのデフォルト値とカスタム値', ()
   const b2 = ParfaitPhysics.createBody(
     { id: 'takoyaki', name: 'たこやき', icon: '🐙', radius: 30, isNeta: true },
     150, 80,
-    { vx: 1.5, vy: -1.0, rot: 0.5, vRot: 0.2, isGrounded: true, stillSteps: 12, isSettled: true, spawnTime: 123456 }
+    { vx: 1.5, vy: -1.0, rot: 0.5, vRot: 0.2, isGrounded: true, stillSteps: 12, noContactSteps: 5, isSettled: true, spawnTime: 123456 }
   );
   assert.equal(b2.radius, 30);
   assert.equal(b2.isNeta, true);
@@ -380,6 +479,7 @@ test('createBody: 全パラメータのデフォルト値とカスタム値', ()
   assert.equal(b2.vRot, 0.2);
   assert.equal(b2.isGrounded, true);
   assert.equal(b2.stillSteps, 12);
+  assert.equal(b2.noContactSteps, 5);
   assert.equal(b2.isSettled, true);
   assert.equal(b2.spawnTime, 123456);
 });
