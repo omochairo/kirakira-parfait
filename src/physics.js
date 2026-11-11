@@ -176,12 +176,23 @@ const ParfaitPhysics = (function () {
     let spilledCount = 0;
 
     for (let step = 0; step < subSteps; step++) {
+      const hasContact = new Array(bodies.length).fill(false);
+      const supported = new Array(bodies.length).fill(false);
+      const woken = new Array(bodies.length).fill(false);
+      const prevX = new Array(bodies.length);
+      const prevY = new Array(bodies.length);
+
       // 1. 各剛体の位置・速度更新
       for (let i = 0; i < bodies.length; i++) {
         const b = bodies[i];
+        prevX[i] = b.x;
+        prevY[i] = b.y;
         b.vy += gravity;
         b.vx *= friction;
         b.vy *= friction;
+        if (Math.hypot(b.vx, b.vy) >= 2.5) {
+          woken[i] = true;
+        }
         b.x += b.vx / subSteps;
         b.y += b.vy / subSteps;
 
@@ -196,7 +207,10 @@ const ParfaitPhysics = (function () {
         // カップ内にいる剛体のみ壁衝突・クランプ・こぼれ判定
         if (b.inCup) {
           for (let j = 0; j < geom.walls.length; j++) {
-            resolveCircleLineCollision(b, geom.walls[j]);
+            if (resolveCircleLineCollision(b, geom.walls[j])) {
+              hasContact[i] = true;
+              supported[i] = true;
+            }
           }
 
           clampBodyInCup(b, geom);
@@ -214,13 +228,23 @@ const ParfaitPhysics = (function () {
           b.isGrounded = false;
         } else {
           b.isGrounded = (b.y >= geom.bottomY - b.radius - 2);
+          if (b.isGrounded || b.isSettled) {
+            supported[i] = true;
+          }
         }
       }
 
       // 3. 円同士の衝突判定
       for (let i = 0; i < bodies.length; i++) {
         for (let j = i + 1; j < bodies.length; j++) {
-          resolveCircleCircleCollision(bodies[i], bodies[j]);
+          if (resolveCircleCircleCollision(bodies[i], bodies[j])) {
+            hasContact[i] = true;
+            hasContact[j] = true;
+            if (supported[i] || supported[j]) {
+              supported[i] = true;
+              supported[j] = true;
+            }
+          }
         }
       }
 
@@ -243,6 +267,7 @@ const ParfaitPhysics = (function () {
 
           if (distSq <= (minDist + 2) * (minDist + 2) && dy < -minDist * 0.4) {
             bUpper.isGrounded = true;
+            supported[upperIdx] = true;
             if (bUpper.vy > 0 && Math.abs(bUpper.vy) < 1.0) {
               bUpper.vy = 0;
             }
@@ -250,14 +275,21 @@ const ParfaitPhysics = (function () {
         }
       }
 
-      // 4.5 接地している剛体のスリープ減衰（積み上がったタワーの微振動・ジッターを止める）
+      // 4.5 接地・静止している剛体のスリープ減衰（強い衝撃で起きた剛体を除き、微振動・クリープを止める）
       for (let i = 0; i < bodies.length; i++) {
         const b = bodies[i];
-        if (b.inCup && b.isGrounded) {
+        if (Math.hypot(b.vx, b.vy) >= 2.5) {
+          woken[i] = true;
+        }
+        if (b.inCup && (b.isGrounded || (b.isSettled && !woken[i]))) {
           b.vx *= 0.5;
           b.vy *= 0.5;
           if (Math.abs(b.vx) < 0.15) b.vx = 0;
           if (Math.abs(b.vy) < 0.15) b.vy = 0;
+          if (b.isSettled && !woken[i] && hasContact[i] && b.vx === 0 && b.vy === 0) {
+            b.x = prevX[i];
+            b.y = prevY[i];
+          }
         }
       }
 
@@ -266,17 +298,21 @@ const ParfaitPhysics = (function () {
         clampBodyInCup(bodies[i], geom);
       }
 
-      // 6. 速度ベースの静止（settled）状態判定
+      // 6. 速度・接触ベースの静止（settled）状態判定（ヒステリシス付き）
       for (let i = 0; i < bodies.length; i++) {
         const b = bodies[i];
-        if (b.inCup && Math.hypot(b.vx, b.vy) < 1.0) {
+        if (!b.inCup || woken[i]) {
+          b.stillSteps = 0;
+          b.isSettled = false;
+          continue;
+        }
+        const speed = Math.hypot(b.vx, b.vy);
+        const enterThreshold = hasContact[i] ? 1.5 : 1.0;
+        if (supported[i] && speed < enterThreshold) {
           b.stillSteps = (b.stillSteps || 0) + 1;
           if (b.stillSteps >= 36) {
             b.isSettled = true;
           }
-        } else {
-          b.stillSteps = 0;
-          b.isSettled = false;
         }
       }
     }
