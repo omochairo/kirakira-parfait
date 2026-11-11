@@ -5,6 +5,9 @@ const ParfaitPhysics = (function () {
    * カップの幾何形状および当たり判定用の線分壁を計算
    */
   function computeCupGeometry(cup, stageWidth, stageHeight) {
+    if (!Number.isFinite(stageWidth) || stageWidth <= 0 || !Number.isFinite(stageHeight) || stageHeight <= 0) {
+      return null;
+    }
     const cx = stageWidth / 2;
     const cy = stageHeight - 40;
 
@@ -173,6 +176,7 @@ const ParfaitPhysics = (function () {
         b.isGrounded = false;
         b.isSettled = false;
         b.stillSteps = 0;
+        b.noContactSteps = 0;
         return true;
       }
     }
@@ -288,6 +292,22 @@ const ParfaitPhysics = (function () {
         }
       }
 
+      // 4.2 支持喪失による起床判定（連続無接触で空中固定を解除）
+      for (let i = 0; i < bodies.length; i++) {
+        const b = bodies[i];
+        if (!b.inCup || hasContact[i]) {
+          b.noContactSteps = 0;
+        } else {
+          b.noContactSteps = (b.noContactSteps || 0) + 1;
+          if (b.noContactSteps > 45 && (b.isSettled || b.isGrounded)) {
+            b.isSettled = false;
+            b.isGrounded = false;
+            b.stillSteps = 0;
+            woken[i] = true;
+          }
+        }
+      }
+
       // 4.5 接地・静止している剛体のスリープ減衰（強い衝撃で起きた剛体を除き、微振動・クリープを止める）
       for (let i = 0; i < bodies.length; i++) {
         const b = bodies[i];
@@ -354,6 +374,7 @@ const ParfaitPhysics = (function () {
       inCup: true,
       isGrounded: !!options.isGrounded,
       stillSteps: options.stillSteps !== undefined ? options.stillSteps : 0,
+      noContactSteps: options.noContactSteps !== undefined ? options.noContactSteps : 0,
       isSettled: !!options.isSettled,
       spawnTime: options.spawnTime || Date.now()
     };
