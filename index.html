@@ -1191,17 +1191,21 @@
 
     function resizeStage() {
       const rect = stageWrap.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
       const dpr = window.devicePixelRatio || 1;
       stageCanvas.width = rect.width * dpr;
       stageCanvas.height = rect.height * dpr;
-      stageCtx.scale(dpr, dpr);
+      stageCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
       updateCupGeometry();
     }
     window.addEventListener('resize', resizeStage);
 
     function updateCupGeometry() {
       const rect = stageWrap.getBoundingClientRect();
-      cupGeom = ParfaitPhysics.computeCupGeometry(selectedCup, rect.width, rect.height);
+      const nextGeom = ParfaitPhysics.computeCupGeometry(selectedCup, rect.width, rect.height);
+      if (nextGeom) {
+        cupGeom = nextGeom;
+      }
     }
 
     function spawnIngredient(ingId) {
@@ -1496,6 +1500,8 @@
       btnServe.innerHTML = '<span>✨</span> はい、どうぞ！';
       badgeText.textContent = `おみせやさん (1/${State.maxCustomers})`;
       switchScreen(screenGame);
+      requestAnimationFrame(resizeStage);
+      setTimeout(resizeStage, 120);
       nextCustomer();
     }
 
@@ -1513,6 +1519,8 @@
       btnServe.innerHTML = '<span>📸</span> きろくを のこす！';
       badgeText.textContent = 'たかさチャレンジ！';
       switchScreen(screenGame);
+      requestAnimationFrame(resizeStage);
+      setTimeout(resizeStage, 120);
     }
 
     function startFreeMode() {
@@ -1526,6 +1534,8 @@
       btnServe.innerHTML = '<span>📸</span> できた！（しゃしん）';
       badgeText.textContent = 'じゆうに つくるモード';
       switchScreen(screenGame);
+      requestAnimationFrame(resizeStage);
+      setTimeout(resizeStage, 120);
     }
 
     let orderProgressKey = '';
