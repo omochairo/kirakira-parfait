@@ -105,6 +105,19 @@ test('resolveCircleCircleCollision: 円衝突・非衝突・同一点', () => {
   const b5 = { x: 100, y: 100, vx: 0, vy: 0, vRot: 0, radius: 20 };
   const b6 = { x: 100, y: 100, vx: 0, vy: 0, vRot: 0, radius: 20 };
   assert.equal(ParfaitPhysics.resolveCircleCircleCollision(b5, b6), false);
+
+  // 片方のみ静止(isSettled=true)かつ重なりが小さい(<4)場合、静止側は位置押し出しに抵抗すること
+  const bSettled1 = { x: 100, y: 100, vx: 0, vy: 0, vRot: 0, radius: 20, isSettled: true };
+  const bActive2 = { x: 138, y: 100, vx: -1, vy: 0, vRot: 0, radius: 20, isSettled: false }; // totalOverlap = 2
+  assert.equal(ParfaitPhysics.resolveCircleCircleCollision(bSettled1, bActive2), true);
+  assert.equal(bSettled1.x, 100, 'b1(静止)は押し出されない');
+  assert.equal(bActive2.x, 140, 'b2(非静止)が全重なり分押し戻される');
+
+  const bActive1 = { x: 100, y: 100, vx: 1, vy: 0, vRot: 0, radius: 20, isSettled: false };
+  const bSettled2 = { x: 138, y: 100, vx: 0, vy: 0, vRot: 0, radius: 20, isSettled: true }; // totalOverlap = 2
+  assert.equal(ParfaitPhysics.resolveCircleCircleCollision(bActive1, bSettled2), true);
+  assert.equal(bActive1.x, 98, 'b1(非静止)が全重なり分押し戻される');
+  assert.equal(bSettled2.x, 138, 'b2(静止)は押し出されない');
 });
 
 test('checkSpill: こぼれ落ち判定の全分岐', () => {

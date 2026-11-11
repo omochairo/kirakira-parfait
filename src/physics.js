@@ -107,14 +107,27 @@ const ParfaitPhysics = (function () {
     const minDist = b1.radius + b2.radius;
 
     if (dist < minDist && dist > 0.0001) {
-      const overlap = (minDist - dist) * 0.5;
+      const totalOverlap = minDist - dist;
       const nx = dx / dist;
       const ny = dy / dist;
 
-      b1.x -= nx * overlap;
-      b1.y -= ny * overlap;
-      b2.x += nx * overlap;
-      b2.y += ny * overlap;
+      // 静止剛体は、大きな重なりでない限り位置押し出しに抵抗し、非静止側を優先して押し戻す
+      let w1 = 0.5;
+      let w2 = 0.5;
+      if (totalOverlap < 4) {
+        if (b1.isSettled && !b2.isSettled) {
+          w1 = 0;
+          w2 = 1;
+        } else if (!b1.isSettled && b2.isSettled) {
+          w1 = 1;
+          w2 = 0;
+        }
+      }
+
+      b1.x -= nx * totalOverlap * w1;
+      b1.y -= ny * totalOverlap * w1;
+      b2.x += nx * totalOverlap * w2;
+      b2.y += ny * totalOverlap * w2;
 
       const relVx = b1.vx - b2.vx;
       const relVy = b1.vy - b2.vy;
@@ -286,7 +299,9 @@ const ParfaitPhysics = (function () {
           b.vy *= 0.5;
           if (Math.abs(b.vx) < 0.15) b.vx = 0;
           if (Math.abs(b.vy) < 0.15) b.vy = 0;
-          if (b.isSettled && !woken[i] && hasContact[i] && b.vx === 0 && b.vy === 0) {
+          if (b.isSettled && !woken[i] && hasContact[i]) {
+            b.vx = 0;
+            b.vy = 0;
             b.x = prevX[i];
             b.y = prevY[i];
           }

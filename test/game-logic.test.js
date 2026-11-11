@@ -151,6 +151,73 @@ test('evaluateParfait: 積み上がり順（したから）で完全一致を判
   assert.equal(resNotPerfect.status, 'good');
 });
 
+test('getSettledOrderIds / evaluateParfait: 横並び（同一レイヤー）の順序判定とUIチェックマークの一致', () => {
+  // 1. 空配列や未静止のみの剛体では空配列を返すこと
+  assert.deepEqual(ParfaitGameLogic.getSettledOrderIds([]), []);
+  assert.deepEqual(
+    ParfaitGameLogic.getSettledOrderIds([
+      { id: 'vanilla', inCup: true, isGrounded: false, isSettled: false, y: 200 },
+      { id: 'strawberry', inCup: false, isGrounded: true, isSettled: true, y: 300 }
+    ]),
+    []
+  );
+
+  // 2. 横並びで2個目のほうが少しだけ低い位置（yが大きい）に滑り込んだ場合でも、
+  //    同じ層（中心y差 < 0.8 * 平均半径）内なら投入順（配列順）が維持され、perfectになること
+  const order = ['vanilla', 'strawberry', 'cherry'];
+  const sideBySideBodies = [
+    { id: 'vanilla', radius: 28, isNeta: false, inCup: true, isGrounded: true, y: 522 },
+    { id: 'strawberry', radius: 25, isNeta: false, inCup: true, isSettled: true, y: 535 }, // yはvanillaより下だが差13px (< 0.8*26.5=21.2)
+    { id: 'cherry', radius: 24, isNeta: false, inCup: true, isSettled: true, y: 485 }       // 上の層（535 - 485 = 50px >= 20.5）
+  ];
+  const settledIds = ParfaitGameLogic.getSettledOrderIds(sideBySideBodies);
+  assert.deepEqual(settledIds, ['vanilla', 'strawberry', 'cherry']);
+  // updateOrderProgress と同じチェック判定が全チップ true になること
+  const chipDoneFlags = order.map((ordId, idx) => settledIds[idx] !== undefined && settledIds[idx] === ordId);
+  assert.deepEqual(chipDoneFlags, [true, true, true]);
+  assert.equal(ParfaitGameLogic.evaluateParfait(order, sideBySideBodies).status, 'perfect');
+
+  // 3. 層ごとの上下関係が正しければ、上の層の材料が配列上で先に入っていても各層内で投入順が保たれ perfect になること
+  const swappedDropAcrossLayers = [
+    { id: 'cherry', radius: 24, isNeta: false, inCup: true, isSettled: true, y: 470 },
+    { id: 'vanilla', radius: 28, isNeta: false, inCup: true, isGrounded: true, y: 525 },
+    { id: 'strawberry', radius: 25, isNeta: false, inCup: true, isSettled: true, y: 535 }
+  ];
+  assert.deepEqual(ParfaitGameLogic.getSettledOrderIds(swappedDropAcrossLayers), ['vanilla', 'strawberry', 'cherry']);
+  assert.equal(ParfaitGameLogic.evaluateParfait(order, swappedDropAcrossLayers).status, 'perfect');
+
+  // 4. 物理シミュレーション実測シナリオ: カップ内で2個が横並び層になったおみせやさんモードで perfect & チェック一致
+  const geom = ParfaitPhysics.computeCupGeometry(ParfaitGameLogic.CUPS[1], 400, 600);
+  const vanillaIng = ParfaitGameLogic.INGREDIENTS.find(i => i.id === 'vanilla');
+  const strawIng = ParfaitGameLogic.INGREDIENTS.find(i => i.id === 'strawberry');
+  const cherryIng = ParfaitGameLogic.INGREDIENTS.find(i => i.id === 'cherry');
+  const simBodies = [];
+
+  simBodies.push(ParfaitPhysics.createBody(vanillaIng, geom.cx - 22, 30, { vx: -0.3, vy: 2.5 }));
+  for (let f = 0; f < 120; f++) ParfaitPhysics.stepSimulation(simBodies, geom);
+
+  simBodies.push(ParfaitPhysics.createBody(strawIng, geom.cx + 22, 30, { vx: 0.3, vy: 2.5 }));
+  for (let f = 0; f < 120; f++) ParfaitPhysics.stepSimulation(simBodies, geom);
+
+  simBodies.push(ParfaitPhysics.createBody(cherryIng, geom.cx, 30, { vx: 0, vy: 2.5 }));
+  for (let f = 0; f < 180; f++) ParfaitPhysics.stepSimulation(simBodies, geom);
+
+  // 下の2個（vanilla, strawberry）が横並びで同じ層に収まっていることを確認
+  assert.ok(Math.abs(simBodies[0].y - simBodies[1].y) < 0.8 * 26.5);
+  const simOrderIds = ParfaitGameLogic.getSettledOrderIds(simBodies);
+  assert.deepEqual(simOrderIds, order);
+  assert.equal(ParfaitGameLogic.evaluateParfait(order, simBodies).status, 'perfect');
+
+  // 5. 本当に上下の順番が逆（別レイヤーで逆順）の場合は perfect にならず good になること
+  const genuinelyWrongVertical = [
+    { id: 'cherry', radius: 24, isNeta: false, inCup: true, isGrounded: true, y: 535 },
+    { id: 'strawberry', radius: 25, isNeta: false, inCup: true, isSettled: true, y: 490 },
+    { id: 'vanilla', radius: 28, isNeta: false, inCup: true, isSettled: true, y: 440 }
+  ];
+  assert.deepEqual(ParfaitGameLogic.getSettledOrderIds(genuinelyWrongVertical), ['cherry', 'strawberry', 'vanilla']);
+  assert.equal(ParfaitGameLogic.evaluateParfait(order, genuinelyWrongVertical).status, 'good');
+});
+
 test('evaluateParfait: 材料を大量に入れたごまかしは おしい にならないこと', () => {
   const order = ['vanilla', 'strawberry', 'cherry'];
   // 注文の材料は全部入っているが、余分な材料が3個も入っている（合計6個）
@@ -471,6 +538,41 @@ test('受入シミュレーション: 15個たこやきタワードリフト検�
   assert.ok(
     stablePatternCount >= 4,
     `At least 4 of 5 patterns must have |H1 - H2| <= 1 (got ${stablePatternCount}/5)`
+  );
+
+  // 3. メガボウル（CUPS[2]・800x700ステージ）での15個たこやきタワードリフト検証（|H1 - H2| <= 2 が5パターン中4パターン以上）
+  const megaCup = ParfaitGameLogic.CUPS[2];
+  const megaGeom = ParfaitPhysics.computeCupGeometry(megaCup, 800, 700);
+  let megaStableCount = 0;
+
+  for (const pat of patterns) {
+    const megaBodies = [];
+    for (let i = 0; i < 15; i++) {
+      const { offset, vx } = pat.spawn(i);
+      megaBodies.push(ParfaitPhysics.createBody(takoyaki, megaGeom.cx + offset, 30, { vx, vy: 2.5 }));
+      for (let f = 0; f < 30; f++) {
+        ParfaitPhysics.stepSimulation(megaBodies, megaGeom);
+      }
+    }
+
+    for (let f = 0; f < 300; f++) {
+      ParfaitPhysics.stepSimulation(megaBodies, megaGeom);
+    }
+    const mh1 = ParfaitGameLogic.calculateHeight(megaBodies, megaGeom.bottomY);
+
+    for (let f = 0; f < 300; f++) {
+      ParfaitPhysics.stepSimulation(megaBodies, megaGeom);
+    }
+    const mh2 = ParfaitGameLogic.calculateHeight(megaBodies, megaGeom.bottomY);
+
+    if (Math.abs(mh1 - mh2) <= 2) {
+      megaStableCount++;
+    }
+  }
+
+  assert.ok(
+    megaStableCount >= 4,
+    `Mega Bowl: at least 4 of 5 patterns must have |H1 - H2| <= 2 (got ${megaStableCount}/5)`
   );
 });
 
