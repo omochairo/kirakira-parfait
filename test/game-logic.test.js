@@ -366,6 +366,114 @@ test('回帰テスト: 横並び・壁もたれ静止時に evaluateParfait が 
   assert.equal(sawUnGroundedSettled, true, '横並びで isGrounded=false かつ isSettled=true のケースが再現されていること');
 });
 
+test('受入シミュレーション: 15個たこやきタワードリフト検証（|H1 - H2| <= 1）および3個注文の非falling検証', () => {
+  const cup = ParfaitGameLogic.CUPS[0]; // プチカップ
+  const geom = ParfaitPhysics.computeCupGeometry(cup, 400, 600);
+  const takoyaki = ParfaitGameLogic.INGREDIENTS.find(i => i.id === 'takoyaki');
+  const order = ['vanilla', 'strawberry', 'cherry'];
+  const orderIngs = order.map(id => ParfaitGameLogic.INGREDIENTS.find(i => i.id === id));
+
+  // 5種類以上のゲーム同等の投下オフセット＆初速パターン（center ±20, vx ±0.75, vy 2.5）
+  const patterns = [
+    {
+      name: 'pattern-1 (alternating medium)',
+      spawn: i => ({
+        offset: (i % 2 === 0 ? 1 : -1) * (6 + ((i * 7) % 14)),
+        vx: (i % 2 === 0 ? 1 : -1) * (0.15 + ((i * 3) % 6) * 0.1)
+      })
+    },
+    {
+      name: 'pattern-2 (wide rim-heavy)',
+      spawn: i => ({
+        offset: (i % 2 === 0 ? -1 : 1) * (10 + ((i * 5 + 3) % 11)),
+        vx: (i % 2 === 0 ? -1 : 1) * (0.25 + ((i * 4) % 5) * 0.12)
+      })
+    },
+    {
+      name: 'pattern-3 (pseudo-random LCG seed 1)',
+      spawn: i => {
+        const s1 = ((i + 1) * 1103515245 + 12345) & 0x7fffffff;
+        const s2 = ((i + 1) * 214013 + 2531011) & 0x7fffffff;
+        return {
+          offset: ((s1 / 0x7fffffff) - 0.5) * 40,
+          vx: ((s2 / 0x7fffffff) - 0.5) * 1.5
+        };
+      }
+    },
+    {
+      name: 'pattern-4 (pseudo-random LCG seed 2)',
+      spawn: i => {
+        const s1 = ((i + 7) * 1103515245 + 54321) & 0x7fffffff;
+        const s2 = ((i + 7) * 214013 + 987654) & 0x7fffffff;
+        return {
+          offset: ((s1 / 0x7fffffff) - 0.5) * 40,
+          vx: ((s2 / 0x7fffffff) - 0.5) * 1.5
+        };
+      }
+    },
+    {
+      name: 'pattern-5 (extreme ±20 / ±0.75)',
+      spawn: i => ({
+        offset: (i % 3 === 0 ? 20 : i % 3 === 1 ? -20 : 8),
+        vx: (i % 3 === 0 ? -0.75 : i % 3 === 1 ? 0.75 : -0.3)
+      })
+    }
+  ];
+
+  let stablePatternCount = 0;
+
+  for (const pat of patterns) {
+    // 1. 15個たこやきタワードリフト検証（30フレームごとに投下 -> 300フレーム後 H1 -> さらに300フレーム後 H2）
+    const bodies = [];
+    for (let i = 0; i < 15; i++) {
+      const { offset, vx } = pat.spawn(i);
+      bodies.push(ParfaitPhysics.createBody(takoyaki, geom.cx + offset, 30, { vx, vy: 2.5 }));
+      for (let f = 0; f < 30; f++) {
+        ParfaitPhysics.stepSimulation(bodies, geom);
+      }
+    }
+
+    for (let f = 0; f < 300; f++) {
+      ParfaitPhysics.stepSimulation(bodies, geom);
+    }
+    const h1 = ParfaitGameLogic.calculateHeight(bodies, geom.bottomY);
+
+    for (let f = 0; f < 300; f++) {
+      ParfaitPhysics.stepSimulation(bodies, geom);
+    }
+    const h2 = ParfaitGameLogic.calculateHeight(bodies, geom.bottomY);
+
+    if (Math.abs(h1 - h2) <= 1) {
+      stablePatternCount++;
+    }
+
+    // 2. 同じドロップ方式での3個注文判定が静止後に 'falling' にならないこと
+    const shopBodies = [];
+    for (let i = 0; i < 3; i++) {
+      const { offset, vx } = pat.spawn(i);
+      shopBodies.push(ParfaitPhysics.createBody(orderIngs[i], geom.cx + offset, 30, { vx, vy: 2.5 }));
+      for (let f = 0; f < 30; f++) {
+        ParfaitPhysics.stepSimulation(shopBodies, geom);
+      }
+    }
+    for (let f = 0; f < 300; f++) {
+      ParfaitPhysics.stepSimulation(shopBodies, geom);
+    }
+
+    const evalRes = ParfaitGameLogic.evaluateParfait(order, shopBodies);
+    assert.notEqual(
+      evalRes.status,
+      'falling',
+      `${pat.name} should not return 'falling' after settling`
+    );
+  }
+
+  assert.ok(
+    stablePatternCount >= 4,
+    `At least 4 of 5 patterns must have |H1 - H2| <= 1 (got ${stablePatternCount}/5)`
+  );
+});
+
 test('checkNewRecord: 新記録更新判定の全分岐', () => {
   // 更新成功
   assert.equal(ParfaitGameLogic.checkNewRecord(30, 25), true);

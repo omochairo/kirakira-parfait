@@ -415,7 +415,7 @@
     /* トースト通知 */
     .stage-toast {
       position: absolute;
-      top: 10px;
+      top: 148px;
       left: 50%;
       transform: translateX(-50%) scale(0.8);
       background: #fff;
@@ -1180,9 +1180,12 @@
     ParfaitGameLogic.checkCupUnlock(totalClears, ParfaitGameLogic.CUPS);
     let cupGeom = null;
 
-    // 高さ・ベスト記録管理
+    // 高さ・ベスト記録管理（約1秒＝60フレーム連続で安定した高さのみベスト記録として確定）
     const PX_PER_CM = 6;
+    const STABLE_HEIGHT_FRAMES = 60;
     let currentHeightCm = 0;
+    let candidateHeightCm = 0;
+    let stableHeightFrames = 0;
     let bestHeightRecord = parseInt(localStorage.getItem('parfait_best_height') || '0', 10);
     let isNewRecordAchievedInSession = false;
 
@@ -1339,7 +1342,7 @@
         stageCtx.shadowBlur = 6;
         stageCtx.shadowOffsetY = 4;
 
-        const fontSize = Math.floor(b.radius * 2.1);
+        const fontSize = Math.floor(b.radius * 1.9);
         stageCtx.font = `${fontSize}px 'M PLUS Rounded 1c', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif`;
         stageCtx.textAlign = 'center';
         stageCtx.textBaseline = 'middle';
@@ -1395,14 +1398,28 @@
         if (State.mode === 'height') {
           document.getElementById('live-height-text').textContent = `${currentHeightCm}cm`;
 
-          // 新記録判定（currentHeightCm > 0 かつ 着地・安定したタワーの高さのみ）
-          if (currentHeightCm > 0 && ParfaitGameLogic.checkNewRecord(currentHeightCm, bestHeightRecord)) {
-            bestHeightRecord = currentHeightCm;
+          if (currentHeightCm <= 0) {
+            candidateHeightCm = 0;
+            stableHeightFrames = 0;
+          } else if (currentHeightCm !== candidateHeightCm) {
+            candidateHeightCm = currentHeightCm;
+            stableHeightFrames = 1;
+          } else {
+            stableHeightFrames++;
+          }
+
+          // 新記録判定（約1秒間安定して維持されたタワーの高さのみコミット）
+          if (
+            candidateHeightCm > 0 &&
+            stableHeightFrames >= STABLE_HEIGHT_FRAMES &&
+            ParfaitGameLogic.checkNewRecord(candidateHeightCm, bestHeightRecord)
+          ) {
+            bestHeightRecord = candidateHeightCm;
             try { localStorage.setItem('parfait_best_height', bestHeightRecord.toString()); } catch (e) { /* 保存できない環境では記録なしで続行 */ }
             document.getElementById('live-best-badge').textContent = `👑 ベスト：${bestHeightRecord}cm`;
             updateTitleBestRecord();
 
-            if (!isNewRecordAchievedInSession && currentHeightCm >= 10) {
+            if (!isNewRecordAchievedInSession && bestHeightRecord >= 10) {
               isNewRecordAchievedInSession = true;
               sound.playRecord();
               fireConfetti();
@@ -1488,6 +1505,8 @@
         badgeText.textContent = 'パフェやさん';
         bodies = [];
         currentHeightCm = 0;
+        candidateHeightCm = 0;
+        stableHeightFrames = 0;
         updateTitleBestRecord();
       } else {
         btnHome.style.display = 'flex';
@@ -1517,6 +1536,9 @@
       State.mode = 'height';
       State.isServing = false;
       bodies = [];
+      currentHeightCm = 0;
+      candidateHeightCm = 0;
+      stableHeightFrames = 0;
       isNewRecordAchievedInSession = false;
       customerPanel.style.display = 'none';
       heightChallengePanel.style.display = 'flex';
@@ -1786,6 +1808,8 @@
     btnClear.addEventListener('click', () => {
       sound.playClick();
       bodies = [];
+      candidateHeightCm = 0;
+      stableHeightFrames = 0;
     });
 
     btnServe.addEventListener('click', submitParfait);
@@ -1817,6 +1841,8 @@
       if (!window.confirm('さいこうきろくを リセットしますか？')) return;
       sound.playClick();
       bestHeightRecord = 0;
+      candidateHeightCm = 0;
+      stableHeightFrames = 0;
       localStorage.removeItem('parfait_best_height');
       updateTitleBestRecord();
       showStageToast('きろくを リセットしたよ！');
