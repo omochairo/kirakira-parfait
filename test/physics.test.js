@@ -120,16 +120,20 @@ test('checkSpill: こぼれ落ち判定の全分岐', () => {
   assert.equal(ParfaitPhysics.checkSpill({ inCup: true, x: 200, y: 500 }, geom), false);
 
   // 左外側へ落下
-  const bLeft = { inCup: true, x: geom.leftBotX - 30, y: 500, isGrounded: true };
+  const bLeft = { inCup: true, x: geom.leftBotX - 30, y: 500, isGrounded: true, isSettled: true, stillSteps: 36 };
   assert.equal(ParfaitPhysics.checkSpill(bLeft, geom), true);
   assert.equal(bLeft.inCup, false);
   assert.equal(bLeft.isGrounded, false);
+  assert.equal(bLeft.isSettled, false);
+  assert.equal(bLeft.stillSteps, 0);
 
   // 右外側へ落下
-  const bRight = { inCup: true, x: geom.rightBotX + 30, y: 500, isGrounded: true };
+  const bRight = { inCup: true, x: geom.rightBotX + 30, y: 500, isGrounded: true, isSettled: true, stillSteps: 36 };
   assert.equal(ParfaitPhysics.checkSpill(bRight, geom), true);
   assert.equal(bRight.inCup, false);
   assert.equal(bRight.isGrounded, false);
+  assert.equal(bRight.isSettled, false);
+  assert.equal(bRight.stillSteps, 0);
 });
 
 test('stepSimulation: 接地フラグの伝播とシミュレーション', () => {
@@ -227,6 +231,43 @@ test('stepSimulation: 接地した剛体はスリープ減衰で微振動が止�
   assert.ok(bAir.vx > 0, '空中剛体の速度はスリープ減衰でゼロにされない');
 });
 
+test('stepSimulation: 速度ベースの静止（stillSteps / isSettled）状態遷移の全分岐', () => {
+  const geom = ParfaitPhysics.computeCupGeometry({ topWidth: 200, bottomWidth: 100, cupHeight: 150 }, 400, 600);
+
+  // 1. カップ内で低速（hypot < 1.0）を維持すると stillSteps が増加し、36サブステップ到達で isSettled = true になること
+  const bStill = ParfaitPhysics.createBody({ id: 's', name: 's', icon: '🍨', radius: 20 }, 200, 540, { vx: 0, vy: 0 });
+  assert.equal(bStill.stillSteps, 0);
+  assert.equal(bStill.isSettled, false);
+
+  // 35サブステップ時点ではまだ閾値未満
+  ParfaitPhysics.stepSimulation([bStill], geom, { subSteps: 35, gravity: 0 });
+  assert.equal(bStill.stillSteps, 35);
+  assert.equal(bStill.isSettled, false);
+
+  // 36サブステップ目で isSettled = true に遷移
+  ParfaitPhysics.stepSimulation([bStill], geom, { subSteps: 1, gravity: 0 });
+  assert.equal(bStill.stillSteps, 36);
+  assert.equal(bStill.isSettled, true);
+
+  // 2. 高速移動（hypot >= 1.0）になると stillSteps = 0, isSettled = false にリセットされること
+  bStill.vx = 2.5;
+  bStill.vy = 2.5;
+  ParfaitPhysics.stepSimulation([bStill], geom, { subSteps: 1, gravity: 0 });
+  assert.equal(bStill.stillSteps, 0);
+  assert.equal(bStill.isSettled, false);
+
+  // 3. カップ外（inCup = false）の剛体は速度が0でも絶対に isSettled にならないこと
+  const bOut = ParfaitPhysics.createBody(
+    { id: 'out', name: 'out', icon: '🍨', radius: 20 },
+    50, 500,
+    { vx: 0, vy: 0, stillSteps: 50, isSettled: true }
+  );
+  bOut.inCup = false;
+  ParfaitPhysics.stepSimulation([bOut], geom, { subSteps: 40, gravity: 0 });
+  assert.equal(bOut.stillSteps, 0);
+  assert.equal(bOut.isSettled, false);
+});
+
 test('createBody: 全パラメータのデフォルト値とカスタム値', () => {
   // radius なし、options なし
   const b1 = ParfaitPhysics.createBody({ id: 'test1', name: 'テスト1', icon: '🍓' }, 100, 50);
@@ -238,13 +279,15 @@ test('createBody: 全パラメータのデフォルト値とカスタム値', ()
   assert.equal(b1.vRot, 0);
   assert.equal(b1.inCup, true);
   assert.equal(b1.isGrounded, false);
+  assert.equal(b1.stillSteps, 0);
+  assert.equal(b1.isSettled, false);
   assert.ok(b1.spawnTime > 0);
 
   // 全パラメータ明示指定
   const b2 = ParfaitPhysics.createBody(
     { id: 'takoyaki', name: 'たこやき', icon: '🐙', radius: 30, isNeta: true },
     150, 80,
-    { vx: 1.5, vy: -1.0, rot: 0.5, vRot: 0.2, isGrounded: true, spawnTime: 123456 }
+    { vx: 1.5, vy: -1.0, rot: 0.5, vRot: 0.2, isGrounded: true, stillSteps: 12, isSettled: true, spawnTime: 123456 }
   );
   assert.equal(b2.radius, 30);
   assert.equal(b2.isNeta, true);
@@ -253,5 +296,7 @@ test('createBody: 全パラメータのデフォルト値とカスタム値', ()
   assert.equal(b2.rot, 0.5);
   assert.equal(b2.vRot, 0.2);
   assert.equal(b2.isGrounded, true);
+  assert.equal(b2.stillSteps, 12);
+  assert.equal(b2.isSettled, true);
   assert.equal(b2.spawnTime, 123456);
 });

@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const ParfaitGameLogic = require('../src/game-logic.js');
+const ParfaitPhysics = require('../src/physics.js');
 
 test('generateOrder: 正しく注文が生成されネタ食材が含まれないこと', () => {
   // 通常ターン (turn 1 -> 3個)
@@ -291,6 +292,78 @@ test('calculateHeight: 空中落下中の剛体は無視され、着地・静止
   // 8. 底面より下にいる極端な剛体 (diffPx <= 0)
   const bBelow = [{ y: 550, radius: 10, inCup: true, isGrounded: true, vy: 0 }];
   assert.equal(ParfaitGameLogic.calculateHeight(bBelow, cupBottomY), 0);
+
+  // 9. isGrounded が false でも isSettled が true なら静止剛体として高さ計測されること
+  const bSideSettled = [{ y: 400, radius: 20, inCup: true, isGrounded: false, isSettled: true, vy: 0.3 }];
+  assert.equal(ParfaitGameLogic.calculateHeight(bSideSettled, cupBottomY), 20);
+});
+
+test('回帰テスト: 横並び・壁もたれ静止時に evaluateParfait が falling で永久ブロックされないこと', () => {
+  const cherry = ParfaitGameLogic.INGREDIENTS.find(i => i.id === 'cherry');
+  const whip = ParfaitGameLogic.INGREDIENTS.find(i => i.id === 'whip');
+  const star = ParfaitGameLogic.INGREDIENTS.find(i => i.id === 'star');
+  const order = ['cherry', 'whip', 'star'];
+
+  const stages = [
+    [400, 600],
+    [800, 700]
+  ];
+  const offsetPatterns = [
+    { offsets: [-15, 18, 0], vxs: [-0.3, 0.3, 0] },
+    { offsets: [-15, 18, 20], vxs: [-0.3, 0.3, 0.2] },
+    { offsets: [-18, 18, 2], vxs: [-0.25, 0.25, 0.1] },
+    { offsets: [-12, 16, -3], vxs: [-0.2, 0.2, -0.1] },
+    { offsets: [15, -18, -20], vxs: [0.3, -0.3, -0.2] }
+  ];
+
+  let sawUnGroundedSettled = false;
+
+  for (const [stageW, stageH] of stages) {
+    const geom = ParfaitPhysics.computeCupGeometry(ParfaitGameLogic.CUPS[0], stageW, stageH);
+
+    for (const { offsets, vxs } of offsetPatterns) {
+      const bodies = [];
+
+      bodies.push(ParfaitPhysics.createBody(cherry, geom.cx + offsets[0], 30, { vx: vxs[0], vy: 2.5 }));
+      for (let f = 0; f < 180; f++) {
+        ParfaitPhysics.stepSimulation(bodies, geom);
+      }
+
+      bodies.push(ParfaitPhysics.createBody(whip, geom.cx + offsets[1], 30, { vx: vxs[1], vy: 2.5 }));
+      for (let f = 0; f < 180; f++) {
+        ParfaitPhysics.stepSimulation(bodies, geom);
+      }
+
+      bodies.push(ParfaitPhysics.createBody(star, geom.cx + offsets[2], 30, { vx: vxs[2], vy: 2.5 }));
+      for (let f = 0; f < 300; f++) {
+        ParfaitPhysics.stepSimulation(bodies, geom);
+      }
+
+      if (bodies.some(b => b.inCup && !b.isGrounded && b.isSettled)) {
+        sawUnGroundedSettled = true;
+      }
+
+      const evalRes = ParfaitGameLogic.evaluateParfait(order, bodies);
+      assert.notEqual(
+        evalRes.status,
+        'falling',
+        `Stage ${stageW}x${stageH} offsets=${offsets} should not remain falling`
+      );
+      assert.ok(evalRes.score > 0);
+
+      const heightCm = ParfaitGameLogic.calculateHeight(bodies, geom.bottomY);
+      assert.ok(heightCm >= 15, `Height should include settled side-by-side stack (got ${heightCm}cm)`);
+
+      // 落下中の新規トッピングを追加した直後は必ず 'falling' と判定されること
+      const fallingBody = ParfaitPhysics.createBody(cherry, geom.cx, 30, { vx: 0, vy: 2.5 });
+      bodies.push(fallingBody);
+      assert.equal(ParfaitGameLogic.evaluateParfait(order, bodies).status, 'falling');
+      ParfaitPhysics.stepSimulation(bodies, geom);
+      assert.equal(ParfaitGameLogic.evaluateParfait(order, bodies).status, 'falling');
+    }
+  }
+
+  assert.equal(sawUnGroundedSettled, true, '横並びで isGrounded=false かつ isSettled=true のケースが再現されていること');
 });
 
 test('checkNewRecord: 新記録更新判定の全分岐', () => {

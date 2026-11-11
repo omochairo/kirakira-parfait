@@ -158,6 +158,8 @@ const ParfaitPhysics = (function () {
       if (b.x < cupLeftX || b.x > cupRightX) {
         b.inCup = false;
         b.isGrounded = false;
+        b.isSettled = false;
+        b.stillSteps = 0;
         return true;
       }
     }
@@ -263,6 +265,20 @@ const ParfaitPhysics = (function () {
       for (let i = 0; i < bodies.length; i++) {
         clampBodyInCup(bodies[i], geom);
       }
+
+      // 6. 速度ベースの静止（settled）状態判定
+      for (let i = 0; i < bodies.length; i++) {
+        const b = bodies[i];
+        if (b.inCup && Math.hypot(b.vx, b.vy) < 1.0) {
+          b.stillSteps = (b.stillSteps || 0) + 1;
+          if (b.stillSteps >= 36) {
+            b.isSettled = true;
+          }
+        } else {
+          b.stillSteps = 0;
+          b.isSettled = false;
+        }
+      }
     }
 
     return { spilledCount };
@@ -286,6 +302,8 @@ const ParfaitPhysics = (function () {
       vRot: options.vRot !== undefined ? options.vRot : 0,
       inCup: true,
       isGrounded: !!options.isGrounded,
+      stillSteps: options.stillSteps !== undefined ? options.stillSteps : 0,
+      isSettled: !!options.isSettled,
       spawnTime: options.spawnTime || Date.now()
     };
   }
