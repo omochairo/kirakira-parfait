@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>つくろう！どうぶつもりの キラキラパフェやさん</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,6 +26,11 @@
       -webkit-tap-highlight-color: transparent;
     }
 
+    html,
+    body {
+      touch-action: manipulation;
+    }
+
     body {
       font-family: var(--font-family);
       background: linear-gradient(135deg, #ffd3e2 0%, #ffe9c7 50%, #d8f5ec 100%);
@@ -36,6 +41,17 @@
       color: #55433c;
       overflow-x: hidden;
       padding: 6px;
+    }
+
+    button,
+    .icon-btn,
+    .big-btn,
+    .ing-btn,
+    .btn-act,
+    .palette-grid,
+    .physics-stage-wrap,
+    #stage-canvas {
+      touch-action: manipulation;
     }
 
     #game-container {
@@ -1760,6 +1776,18 @@
     /* ==========================================================
        5. イベント設定
        ========================================================== */
+    const gameContainer = document.getElementById('game-container');
+    let lastTouchEnd = 0;
+    gameContainer.addEventListener('touchend', (e) => {
+      const tag = e.target && e.target.tagName ? e.target.tagName.toUpperCase() : '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      const now = Date.now();
+      if (now - lastTouchEnd <= 300) {
+        e.preventDefault();
+      }
+      lastTouchEnd = now;
+    }, { passive: false });
+
     document.getElementById('btn-start-shop').addEventListener('click', () => {
       sound.playClick();
       startShopMode();

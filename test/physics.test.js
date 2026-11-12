@@ -242,22 +242,22 @@ test('stepSimulation: 接地または静止した剛体はスリープ減衰で�
   assert.equal(bGrounded.vx, 0);
   assert.equal(bGrounded.vy, 0);
 
-  // 非接地（isGrounded=false）でも isSettled=true の剛体にはスリープ減衰が働き、微小速度がゼロになり接触時は位置も保持される
-  const bRimSettled = ParfaitPhysics.createBody(
-    { id: 'rs', name: 'rs', icon: '🍨', radius: 20 },
-    geom.leftTopX,
-    geom.topY - 19,
+  // 非接地（isGrounded=false）でもカップ壁で支持され isSettled=true の剛体にはスリープ減衰が働き、微小速度がゼロになり接触時は位置も保持される
+  const bWallSettled = ParfaitPhysics.createBody(
+    { id: 'ws', name: 'ws', icon: '🍨', radius: 20 },
+    geom.leftTopX + 22,
+    geom.topY + 30,
     { vx: 0.1, vy: 0.1, isGrounded: false, isSettled: true, stillSteps: 36 }
   );
-  const initX = bRimSettled.x;
-  const initY = bRimSettled.y;
-  ParfaitPhysics.stepSimulation([bRimSettled], geom, { subSteps: 1, gravity: 0 });
-  assert.equal(bRimSettled.isGrounded, false);
-  assert.equal(bRimSettled.isSettled, true);
-  assert.equal(bRimSettled.vx, 0);
-  assert.equal(bRimSettled.vy, 0);
-  assert.equal(bRimSettled.x, initX);
-  assert.equal(bRimSettled.y, initY);
+  const initX = bWallSettled.x;
+  const initY = bWallSettled.y;
+  ParfaitPhysics.stepSimulation([bWallSettled], geom, { subSteps: 1, gravity: 0 });
+  assert.equal(bWallSettled.isGrounded, false);
+  assert.equal(bWallSettled.isSettled, true);
+  assert.equal(bWallSettled.vx, 0);
+  assert.equal(bWallSettled.vy, 0);
+  assert.equal(bWallSettled.x, initX);
+  assert.equal(bWallSettled.y, initY);
 
   // 大きめの速度はゼロにはならず、減衰だけされる（空中剛体にはスリープ減衰がかからないことも確認）
   const bMoving = ParfaitPhysics.createBody({ id: 'm', name: 'm', icon: '🍨', radius: 20 }, 200, 540, { vx: 2.0, vy: 0 });
@@ -319,7 +319,7 @@ test('stepSimulation: 速度・接触ベースの静止（stillSteps / isSettled
   assert.equal(bTarget.isSettled, false, '強い衝突を受けた静止剛体は起床する');
   assert.equal(bTarget.stillSteps, 0);
 
-  // 5. 壁・フチ接触時の緩和閾値（< 1.5）による stillSteps 蓄積とフチ上での静止
+  // 5. 底面支持のないフチ乗り剛体は静止（frozen）せず非静止を維持すること、およびカップ内壁接触時の緩和閾値（< 1.5）による静止
   const bOnRim = ParfaitPhysics.createBody(
     { id: 'rim', name: 'rim', icon: '🍒', radius: 24 },
     geom.leftTopX,
@@ -331,19 +331,31 @@ test('stepSimulation: 速度・接触ベースの静止（stillSteps / isSettled
   }
   assert.equal(bOnRim.inCup, true);
   assert.equal(bOnRim.isGrounded, false, 'フチ上なので底面接地ではない');
-  assert.equal(bOnRim.isSettled, true, 'フチとの壁接触により静止状態になること');
-  assert.equal(bOnRim.vx, 0);
-  assert.equal(bOnRim.vy, 0);
+  assert.equal(bOnRim.isSettled, false, '底面支持のないフチ乗り剛体は静止（frozen）しないこと');
+
+  // 一方、カップ内壁で支持された剛体は緩和閾値（< 1.5）により stillSteps が蓄積して静止すること
+  const bOnWall = ParfaitPhysics.createBody(
+    { id: 'wall', name: 'wall', icon: '🍒', radius: 20 },
+    geom.leftTopX + 22,
+    geom.topY + 30,
+    { vx: 0, vy: 1.2 }
+  );
+  for (let f = 0; f < 30; f++) {
+    ParfaitPhysics.stepSimulation([bOnWall], geom, { subSteps: 6 });
+  }
+  assert.equal(bOnWall.isSettled, true, 'カップ内壁接触時は緩和閾値(< 1.5)で静止状態になること');
+  assert.equal(bOnWall.vx, 0);
+  assert.equal(bOnWall.vy, 0);
 
   // 6. 円接触時の支持伝播（j側が支持を持っている場合の i <- j 伝播分岐も網羅）
   const bUnsupFirst = ParfaitPhysics.createBody(
     { id: 'u1', name: 'u1', icon: '🍓', radius: 20 },
-    200, 490,
+    200, 505,
     { vx: 0, vy: 1.2 }
   );
   const bSupSecond = ParfaitPhysics.createBody(
     { id: 's2', name: 's2', icon: '🍓', radius: 20 },
-    200, 525,
+    200, 540,
     { vx: 0, vy: 0, isSettled: true, stillSteps: 36 }
   );
   ParfaitPhysics.stepSimulation([bUnsupFirst, bSupSecond], geom, { subSteps: 1, gravity: 0 });

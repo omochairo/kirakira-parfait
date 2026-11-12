@@ -226,7 +226,15 @@ const ParfaitPhysics = (function () {
           for (let j = 0; j < geom.walls.length; j++) {
             if (resolveCircleLineCollision(b, geom.walls[j])) {
               hasContact[i] = true;
-              supported[i] = true;
+              const wall = geom.walls[j];
+              // 底面線分（y1, y2がbottomY）との接触のみが直接支持（supported）かつ接地（isGrounded）となる
+              if (Math.abs(wall.y1 - geom.bottomY) < 1 && Math.abs(wall.y2 - geom.bottomY) < 1) {
+                b.isGrounded = true;
+                supported[i] = true;
+              } else if (b.y > geom.topY + 5) {
+                // カップ側壁による支持（接地ではない）
+                supported[i] = true;
+              }
             }
           }
 
@@ -244,8 +252,9 @@ const ParfaitPhysics = (function () {
         if (!b.inCup) {
           b.isGrounded = false;
         } else {
-          b.isGrounded = (b.y >= geom.bottomY - b.radius - 2);
-          if (b.isGrounded || b.isSettled) {
+          const atBottom = b.y >= geom.bottomY - b.radius - 2;
+          if (atBottom) {
+            b.isGrounded = true;
             supported[i] = true;
           }
         }
@@ -257,20 +266,16 @@ const ParfaitPhysics = (function () {
           if (resolveCircleCircleCollision(bodies[i], bodies[j])) {
             hasContact[i] = true;
             hasContact[j] = true;
-            if (supported[i] || supported[j]) {
-              supported[i] = true;
-              supported[j] = true;
-            }
           }
         }
       }
 
-      // 4. 接地状態の伝播（下の剛体 bLower が接地しており、上の剛体 bUpper を下から支えている場合のみ）
+      // 4. 下からの支持（supported / isGrounded）の伝播（底面からの連鎖のみ）
       const sortedIndices = bodies.map((_, idx) => idx).sort((i1, i2) => bodies[i2].y - bodies[i1].y);
       for (let k = 0; k < sortedIndices.length; k++) {
         const lowerIdx = sortedIndices[k];
         const bLower = bodies[lowerIdx];
-        if (!bLower.inCup || !bLower.isGrounded) continue;
+        if (!bLower.inCup || !supported[lowerIdx]) continue;
 
         for (let m = k + 1; m < sortedIndices.length; m++) {
           const upperIdx = sortedIndices[m];
@@ -278,21 +283,45 @@ const ParfaitPhysics = (function () {
           if (!bUpper.inCup) continue;
 
           const dx = bUpper.x - bLower.x;
-          const dy = bUpper.y - bLower.y;
+          const dy = bUpper.y - bLower.y; // bUpper is above bLower, dy < 0
           const distSq = dx * dx + dy * dy;
           const minDist = bLower.radius + bUpper.radius;
 
-          if (distSq <= (minDist + 2) * (minDist + 2) && dy < -minDist * 0.4) {
-            bUpper.isGrounded = true;
-            supported[upperIdx] = true;
-            if (bUpper.vy > 0 && Math.abs(bUpper.vy) < 1.0) {
-              bUpper.vy = 0;
+          if (distSq <= (minDist + 2) * (minDist + 2)) {
+            const isAboveRim = bUpper.y < geom.topY;
+            const dyHeight = bLower.y - bUpper.y;
+
+            if (isAboveRim) {
+              // リムより上: 安定なタワー積載のみ許容（横にはみ出しすぎない）
+              const maxDx = 0.75 * minDist;
+              const withinMouth = bUpper.x >= geom.leftTopX - bUpper.radius * 0.5 && bUpper.x <= geom.rightTopX + bUpper.radius * 0.5;
+              if (dyHeight >= minDist * 0.35 && Math.abs(dx) <= maxDx && withinMouth) {
+                supported[upperIdx] = true;
+                if (bLower.isGrounded && dyHeight > minDist * 0.4 && Math.abs(dx) <= 0.6 * minDist) {
+                  bUpper.isGrounded = true;
+                }
+                if (bUpper.vy > 0 && Math.abs(bUpper.vy) < 1.0) {
+                  bUpper.vy = 0;
+                }
+              }
+            } else {
+              // カップ内部: 横並び・壁もたれ・ハニカム充填を確実に支持
+              const maxDx = 0.95 * minDist;
+              if (dyHeight > 3 && Math.abs(dx) <= maxDx) {
+                supported[upperIdx] = true;
+                if (bLower.isGrounded && dyHeight > minDist * 0.4 && Math.abs(dx) <= 0.6 * minDist) {
+                  bUpper.isGrounded = true;
+                }
+                if (bUpper.vy > 0 && Math.abs(bUpper.vy) < 1.0) {
+                  bUpper.vy = 0;
+                }
+              }
             }
           }
         }
       }
 
-      // 4.2 支持喪失による起床判定（連続無接触で空中固定を解除）
+      // 4.2 支持喪失による起床判定
       for (let i = 0; i < bodies.length; i++) {
         const b = bodies[i];
         if (!b.inCup || hasContact[i]) {
@@ -306,15 +335,23 @@ const ParfaitPhysics = (function () {
             woken[i] = true;
           }
         }
+
+        // 下からの支持を失った剛体の起床（空中浮遊・フチ乗り凍結の解除）
+        if (b.inCup && (b.isSettled || b.isGrounded) && !supported[i]) {
+          b.isSettled = false;
+          b.isGrounded = false;
+          b.stillSteps = 0;
+          woken[i] = true;
+        }
       }
 
-      // 4.5 接地・静止している剛体のスリープ減衰（強い衝撃で起きた剛体を除き、微振動・クリープを止める）
+      // 4.5 下から支持されている剛体のスリープ減衰（強い衝撃で起きた剛体を除き、微振動・クリープを止める）
       for (let i = 0; i < bodies.length; i++) {
         const b = bodies[i];
         if (Math.hypot(b.vx, b.vy) >= 2.5) {
           woken[i] = true;
         }
-        if (b.inCup && (b.isGrounded || (b.isSettled && !woken[i]))) {
+        if (b.inCup && supported[i]) {
           b.vx *= 0.5;
           b.vy *= 0.5;
           if (Math.abs(b.vx) < 0.15) b.vx = 0;
@@ -328,22 +365,33 @@ const ParfaitPhysics = (function () {
         }
       }
 
-      // 5. 衝突による押し出し後に、再度底抜け防止クランプを適用
+      // 5. 衝突による押し出し後に、再度底抜け防止クランプと接触拘束時の速度補正を適用
       for (let i = 0; i < bodies.length; i++) {
-        clampBodyInCup(bodies[i], geom);
+        const b = bodies[i];
+        clampBodyInCup(b, geom);
+        if (hasContact[i] && !woken[i] && supported[i]) {
+          const actualVx = (b.x - prevX[i]) * subSteps;
+          const actualVy = (b.y - prevY[i]) * subSteps;
+          if (b.vy > 0 && actualVy < b.vy) {
+            b.vy = Math.max(0, actualVy);
+          }
+          if (Math.abs(actualVx) < Math.abs(b.vx) && actualVx * b.vx >= 0) {
+            b.vx = actualVx;
+          }
+        }
       }
 
       // 6. 速度・接触ベースの静止（settled）状態判定（ヒステリシス付き）
       for (let i = 0; i < bodies.length; i++) {
         const b = bodies[i];
-        if (!b.inCup || woken[i]) {
+        if (!b.inCup || woken[i] || !supported[i]) {
           b.stillSteps = 0;
           b.isSettled = false;
           continue;
         }
         const speed = Math.hypot(b.vx, b.vy);
         const enterThreshold = hasContact[i] ? 1.5 : 1.0;
-        if (supported[i] && speed < enterThreshold) {
+        if (speed < enterThreshold) {
           b.stillSteps = (b.stillSteps || 0) + 1;
           if (b.stillSteps >= 36) {
             b.isSettled = true;
